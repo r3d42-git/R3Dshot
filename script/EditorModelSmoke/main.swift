@@ -104,6 +104,15 @@ document.elements = [
                 ]
             )
         )
+    ),
+    AnnotationElement(
+        zIndex: 6,
+        transform: ElementTransform(
+            boundsInCanvasPixels: CanvasRect(x: 24, y: 20, width: 30, height: 18)
+        ),
+        payload: .text(
+            TextStyle(text: "R3D", color: .accentRed, fontSize: 14, alignment: .center)
+        )
     )
 ]
 
@@ -128,6 +137,6 @@ try require(
     original.dataProvider?.data as Data? == originalBytesBefore,
     "Renderer modified the original image"
 )
-try require(document.elements.map(\.zIndex) == [1, 0, 2, 3, 4, 5], "Renderer reordered document elements")
+try require(document.elements.map(\.zIndex) == [1, 0, 2, 3, 4, 5, 6], "Renderer reordered document elements")
 
 print("Editor model/renderer smoke test passed")

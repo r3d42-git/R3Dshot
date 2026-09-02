@@ -364,6 +364,74 @@ struct RectangleInspectorView: View {
                     }
                 }
                 .formStyle(.grouped)
+            } else if let style = store.selectedTextStyle {
+                Form {
+                    Section("Text") {
+                        TextEditor(
+                            text: Binding(
+                                get: { style.text },
+                                set: { text in
+                                    updateText(style, actionName: "Text ändern") { $0.text = text }
+                                }
+                            )
+                        )
+                        .font(.body)
+                        .frame(minHeight: 90)
+
+                        ColorPicker(
+                            "Farbe",
+                            selection: colorBinding(
+                                get: { style.color },
+                                set: { color in
+                                    updateText(style, actionName: "Textfarbe ändern") { $0.color = color }
+                                }
+                            )
+                        )
+
+                        LabeledContent("Schriftgröße") {
+                            HStack {
+                                Slider(
+                                    value: valueBinding(
+                                        get: { style.fontSize },
+                                        set: { value in
+                                            updateText(style, actionName: "Schriftgröße ändern") { $0.fontSize = value }
+                                        }
+                                    ),
+                                    in: 8...160
+                                )
+                                Text("\(Int(style.fontSize)) px")
+                                    .monospacedDigit()
+                                    .frame(width: 48, alignment: .trailing)
+                            }
+                        }
+
+                        Picker(
+                            "Ausrichtung",
+                            selection: Binding(
+                                get: { style.alignment },
+                                set: { alignment in
+                                    updateText(style, actionName: "Textausrichtung ändern") { $0.alignment = alignment }
+                                }
+                            )
+                        ) {
+                            Text("Links").tag(AnnotationTextAlignment.leading)
+                            Text("Zentriert").tag(AnnotationTextAlignment.center)
+                            Text("Rechts").tag(AnnotationTextAlignment.trailing)
+                        }
+                    }
+
+                    Section("Anordnung") {
+                        HStack {
+                            Button("Nach vorn") { store.bringSelectionForward() }
+                            Button("Nach hinten") { store.sendSelectionBackward() }
+                        }
+                        HStack {
+                            Button("Duplizieren") { store.duplicateSelection() }
+                            Button("Löschen", role: .destructive) { store.deleteSelection() }
+                        }
+                    }
+                }
+                .formStyle(.grouped)
             } else {
                 ContentUnavailableView(
                     "Keine Auswahl",
@@ -413,6 +481,16 @@ struct RectangleInspectorView: View {
         var updated = current
         mutation(&updated)
         store.setSelectedMarkerStyle(updated, actionName: actionName)
+    }
+
+    private func updateText(
+        _ current: TextStyle,
+        actionName: String,
+        mutation: (inout TextStyle) -> Void
+    ) {
+        var updated = current
+        mutation(&updated)
+        store.setSelectedTextStyle(updated, actionName: actionName)
     }
 
     private func valueBinding(

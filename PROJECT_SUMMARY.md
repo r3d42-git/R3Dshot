@@ -4,7 +4,7 @@ Stand: 2. September 2026
 
 ## Als Nächstes
 
-Phase 2 ist abgeschlossen. Als Nächstes folgt Phase 3: ein nicht-destruktives Text-Element.
+Phase 3 ist abgeschlossen. Als Nächstes folgt Phase 4: Sprechblasen und Schrittmarker.
 
 ### Erledigt: App-Lifecycle und sicheres Beenden
 
@@ -20,8 +20,12 @@ Erledigt: Crop bleibt ein einzelner Dokumentzustand in Bildpixeln, nicht ein Ann
 
 ### Phase 3: Text
 
-- Text erhält ein codierbares Element mit Inhalt, Systemschrift, Größe, Farbe und Ausrichtung.
-- Direkte Bearbeitung, Inspector, Renderer, Auswahl, Skalierung sowie Copy/Paste sind Teil derselben Phase.
+Erledigt: Text ist ein codierbares Element mit Inhalt, Systemschrift, Größe, Farbe, Ausrichtung und Deckkraft. Inspector, Renderer, Auswahl, Skalierung sowie Copy/Paste nutzen dieselbe Dokumentrepräsentation.
+
+### Phase 4: Callouts
+
+- Sprechblasen ergänzen Text mit einem Rahmen und verschiebbarem Zeiger.
+- Schrittmarker sind nummerierte, verschiebbare Kreismarken mit korrigierbarer Zahl.
 
 ## Bestätigter Stand
 

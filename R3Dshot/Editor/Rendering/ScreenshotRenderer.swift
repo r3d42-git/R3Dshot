@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreText
 import Foundation
 
 enum ScreenshotRenderer {
@@ -191,6 +192,8 @@ enum ScreenshotRenderer {
                 context.addLine(to: point)
             }
             context.strokePath()
+        case let .text(style):
+            drawText(style, in: drawingBounds, context: context)
         }
     }
 
@@ -214,6 +217,55 @@ enum ScreenshotRenderer {
         context.addLine(to: right)
     }
 
+    private static func drawText(_ style: TextStyle, in bounds: CGRect, context: CGContext) {
+        let paragraph = paragraphStyle(for: style.alignment)
+        let attributes: [NSAttributedString.Key: Any] = [
+            kCTFontAttributeName as NSAttributedString.Key: CTFontCreateWithName(
+                "SF Pro" as CFString,
+                max(1, style.fontSize),
+                nil
+            ),
+            kCTForegroundColorAttributeName as NSAttributedString.Key: style.color.cgColor,
+            kCTParagraphStyleAttributeName as NSAttributedString.Key: paragraph
+        ]
+        let frame = CTFramesetterCreateFrame(
+            CTFramesetterCreateWithAttributedString(NSAttributedString(string: style.text, attributes: attributes)),
+            CFRange(location: 0, length: 0),
+            CGPath(rect: bounds, transform: nil),
+            nil
+        )
+        CTFrameDraw(frame, context)
+    }
+
+    private static func paragraphStyle(for alignment: AnnotationTextAlignment) -> CTParagraphStyle {
+        var textAlignment: CTTextAlignment
+        switch alignment {
+        case .leading: textAlignment = .left
+        case .center: textAlignment = .center
+        case .trailing: textAlignment = .right
+        }
+        var lineBreakMode = CTLineBreakMode.byWordWrapping
+        return withUnsafePointer(to: &textAlignment) { alignmentPointer in
+            withUnsafePointer(to: &lineBreakMode) { lineBreakPointer in
+                CTParagraphStyleCreate(
+                    [
+                        CTParagraphStyleSetting(
+                            spec: .alignment,
+                            valueSize: MemoryLayout<CTTextAlignment>.size,
+                            value: alignmentPointer
+                        ),
+                        CTParagraphStyleSetting(
+                            spec: .lineBreakMode,
+                            valueSize: MemoryLayout<CTLineBreakMode>.size,
+                            value: lineBreakPointer
+                        )
+                    ],
+                    2
+                )
+            }
+        }
+    }
+
     private static func drawingPoint(
         _ point: NormalizedPoint,
         in bounds: CGRect,
@@ -234,6 +286,7 @@ enum ScreenshotRenderer {
         case let .arrow(style): style.opacity
         case .redaction: 1
         case let .marker(style): style.opacity
+        case let .text(style): style.opacity
         }
     }
 }

@@ -9,6 +9,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
     case arrow
     case redaction
     case marker
+    case text
 
     var id: String { rawValue }
 
@@ -21,6 +22,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .arrow: "Pfeil"
         case .redaction: "Schwärzen"
         case .marker: "Marker"
+        case .text: "Text"
         }
     }
 
@@ -33,6 +35,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .arrow: "arrow.up.right"
         case .redaction: "rectangle.fill"
         case .marker: "highlighter"
+        case .text: "text.cursor"
         }
     }
 
@@ -45,6 +48,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .arrow: "Pfeilwerkzeug – vom Startpunkt zur Pfeilspitze ziehen"
         case .redaction: "Schwärzen – einen Bereich vollständig und dauerhaft sichtbar abdecken"
         case .marker: "Marker – einen Bereich freihändig transparent hervorheben"
+        case .text: "Text – einen editierbaren Textbereich aufziehen"
         }
     }
 }
@@ -87,7 +91,7 @@ final class EditorStore {
     var selectedShapeStyle: ShapeStyle? {
         switch selectedElement?.payload {
         case let .rectangle(style), let .ellipse(style): style
-        case .arrow, .redaction, .marker, nil: nil
+        case .arrow, .redaction, .marker, .text, nil: nil
         }
     }
 
@@ -98,6 +102,7 @@ final class EditorStore {
         case .arrow: "Pfeil"
         case .redaction: "Schwärzung"
         case .marker: "Marker"
+        case .text: "Text"
         case nil: nil
         }
     }
@@ -119,6 +124,11 @@ final class EditorStore {
 
     var selectedMarkerStyle: MarkerStyle? {
         guard case let .marker(style)? = selectedElement?.payload else { return nil }
+        return style
+    }
+
+    var selectedTextStyle: TextStyle? {
+        guard case let .text(style)? = selectedElement?.payload else { return nil }
         return style
     }
 
@@ -264,6 +274,22 @@ final class EditorStore {
         }
     }
 
+    func insertText(in bounds: CanvasRect) {
+        let clamped = bounds.clamped(to: document.original.pixelSize, minimumSize: 12)
+        guard clamped.width >= 12, clamped.height >= 12 else { return }
+
+        perform(actionName: "Text hinzufügen") {
+            let element = AnnotationElement(
+                zIndex: nextZIndex,
+                transform: ElementTransform(boundsInCanvasPixels: clamped),
+                payload: .text(TextStyle())
+            )
+            document.elements.append(element)
+            selectedElementID = element.id
+            activeTool = .select
+        }
+    }
+
     func selectElement(at point: CGPoint, tolerance: CGFloat = 5) {
         selectedElementID = document.elements
             .sorted { $0.zIndex > $1.zIndex }
@@ -394,6 +420,8 @@ final class EditorStore {
                 break
             case .marker:
                 break
+            case .text:
+                break
             }
         }
     }
@@ -422,6 +450,15 @@ final class EditorStore {
         else { return }
         perform(actionName: actionName) {
             document.elements[index].payload = .marker(style)
+        }
+    }
+
+    func setSelectedTextStyle(_ style: TextStyle, actionName: String) {
+        guard let selectedElementID, let index = index(of: selectedElementID),
+              case .text = document.elements[index].payload
+        else { return }
+        perform(actionName: actionName) {
+            document.elements[index].payload = .text(style)
         }
     }
 
@@ -465,7 +502,7 @@ final class EditorStore {
         tolerance: CGFloat
     ) -> Bool {
         switch element.payload {
-        case .rectangle, .ellipse, .redaction:
+        case .rectangle, .ellipse, .redaction, .text:
             return element.transform.boundsInCanvasPixels.cgRect
                 .insetBy(dx: -tolerance, dy: -tolerance)
                 .contains(point)

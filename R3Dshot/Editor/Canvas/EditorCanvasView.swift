@@ -159,7 +159,7 @@ struct EditorCanvasView: View {
 
                 guard let interaction else { return }
                 switch interaction.mode {
-                case .createRectangle, .createEllipse, .createRedaction, .createCrop:
+                case .createRectangle, .createEllipse, .createRedaction, .createCrop, .createText:
                     draftBounds = CanvasRect(
                         CGRect(
                             x: interaction.startPoint.x,
@@ -235,6 +235,10 @@ struct EditorCanvasView: View {
                     if let draftBounds, draftBounds.width >= 4, draftBounds.height >= 4 {
                         store.setCrop(draftBounds)
                     }
+                case .createText:
+                    if let draftBounds, draftBounds.width >= 12, draftBounds.height >= 12 {
+                        store.insertText(in: draftBounds)
+                    }
                 case .move:
                     if let elementID = interaction.elementID,
                        let originalBounds = interaction.originalBounds {
@@ -297,6 +301,13 @@ struct EditorCanvasView: View {
         case .crop:
             interaction = CanvasInteraction(
                 mode: .createCrop,
+                startPoint: point,
+                elementID: nil,
+                originalBounds: nil
+            )
+        case .text:
+            interaction = CanvasInteraction(
+                mode: .createText,
                 startPoint: point,
                 elementID: nil,
                 originalBounds: nil
@@ -371,6 +382,7 @@ private struct CanvasInteraction {
         case createRedaction
         case createMarker
         case createCrop
+        case createText
         case move
         case idle
     }

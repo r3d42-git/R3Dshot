@@ -111,12 +111,27 @@ struct MarkerStyle: Codable, Equatable, Sendable {
     var points: [NormalizedPoint]
 }
 
+enum AnnotationTextAlignment: String, Codable, CaseIterable, Sendable {
+    case leading
+    case center
+    case trailing
+}
+
+struct TextStyle: Codable, Equatable, Sendable {
+    var text: String = "Text"
+    var color: RGBAColor = .accentRed
+    var fontSize: CGFloat = 28
+    var alignment: AnnotationTextAlignment = .leading
+    var opacity: CGFloat = 1
+}
+
 enum AnnotationPayload: Codable, Equatable, Sendable {
     case rectangle(ShapeStyle)
     case ellipse(ShapeStyle)
     case arrow(ArrowStyle)
     case redaction(RedactionStyle)
     case marker(MarkerStyle)
+    case text(TextStyle)
 }
 
 struct AnnotationElement: Identifiable, Codable, Equatable, Sendable {
