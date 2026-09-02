@@ -20,6 +20,7 @@ final class R3DshotAppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarController: MenuBarController?
     private var hotKeyManager: GlobalHotKeyManager?
     private var settingsWindowController: SettingsWindowController?
+    private var isCompletingTermination = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -49,6 +50,9 @@ final class R3DshotAppDelegate: NSObject, NSApplicationDelegate {
             shortcuts: shortcuts,
             onShortcutRecordingChanged: { [weak self] isRecording in
                 self?.setShortcutRecordingActive(isRecording)
+            },
+            onVisibilityChanged: { [weak self] _ in
+                self?.refreshApplicationActivationPolicy()
             }
         )
 
@@ -65,8 +69,8 @@ final class R3DshotAppDelegate: NSObject, NSApplicationDelegate {
         menuBarController.onAboutRequested = { [weak self] in
             self?.openAboutPanel()
         }
-        menuBarController.onQuitRequested = {
-            NSApp.terminate(nil)
+        menuBarController.onQuitRequested = { [weak self] in
+            self?.requestTermination()
         }
 
         let hotKeyManager = GlobalHotKeyManager(shortcutStore: shortcuts)
@@ -92,6 +96,41 @@ final class R3DshotAppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         hotKeyManager?.invalidate()
         menuBarController?.invalidate()
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !isCompletingTermination else {
+            return .terminateNow
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "R3Dshot beenden?"
+        alert.informativeText = "R3Dshot kann weiter im Hintergrund in der Menüleiste bereitstehen."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "In Menüleiste behalten")
+        alert.addButton(withTitle: "R3Dshot beenden")
+        alert.addButton(withTitle: "Abbrechen")
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            guard editorController.closeAllEditors() else {
+                refreshApplicationActivationPolicy()
+                return .terminateCancel
+            }
+            settingsWindowController?.close()
+            refreshApplicationActivationPolicy()
+            return .terminateCancel
+        case .alertSecondButtonReturn:
+            guard editorController.closeAllEditors() else {
+                refreshApplicationActivationPolicy()
+                return .terminateCancel
+            }
+            settingsWindowController?.close()
+            isCompletingTermination = true
+            return .terminateNow
+        default:
+            return .terminateCancel
+        }
     }
 
     func setShortcutRecordingActive(_ isActive: Bool) {
@@ -136,9 +175,11 @@ final class R3DshotAppDelegate: NSObject, NSApplicationDelegate {
 
     private func openLatestEditor() {
         guard let capture = pendingCaptures.captures.first else {
+            refreshApplicationActivationPolicy()
             editorController.focusMostRecentEditor()
             return
         }
+        refreshApplicationActivationPolicy()
         openEditor(for: capture)
     }
 
@@ -149,10 +190,12 @@ final class R3DshotAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func openSettings() {
+        refreshApplicationActivationPolicy()
         settingsWindowController?.open()
     }
 
     private func openAboutPanel() {
+        refreshApplicationActivationPolicy()
         NSApp.orderFrontStandardAboutPanel(
             options: [
                 .applicationName: "R3Dshot",
@@ -190,5 +233,23 @@ final class R3DshotAppDelegate: NSObject, NSApplicationDelegate {
     private func refreshEditorAvailability() {
         menuBarController?.isEditorAvailable = !pendingCaptures.captures.isEmpty
             || editorController.hasOpenEditors
+        refreshApplicationActivationPolicy()
+    }
+
+    private func requestTermination() {
+        NSApp.terminate(nil)
+    }
+
+    /// Editor windows are the sole reason R3Dshot becomes a regular Dock app.
+    /// Settings and auxiliary panels remain usable while the process stays an
+    /// accessory menu-bar application.
+    private func refreshApplicationActivationPolicy() {
+        let policy: NSApplication.ActivationPolicy = editorController.hasOpenEditors
+            ? .regular
+            : .accessory
+        guard NSApp.activationPolicy() != policy else {
+            return
+        }
+        NSApp.setActivationPolicy(policy)
     }
 }

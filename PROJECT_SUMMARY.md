@@ -2,33 +2,23 @@
 
 Stand: 2. September 2026
 
-## Als Nächstes zwingend zuerst
+## Als Nächstes
 
-Vor weiteren Editorwerkzeugen wird die App-Lifecycle-Regression behoben.
+Phase 1 ist abgeschlossen. Als Nächstes folgt Phase 2: ein nicht-destruktiver Crop-Werkzeugpfad.
 
-### 1. Dock-Zustand beim Einstellungsfenster wiederherstellen
+### Erledigt: App-Lifecycle und sicheres Beenden
 
-Aktueller Fehler: Beim Öffnen der Einstellungen erscheint R3Dshot als reguläre Dock-App. Nach dem Schließen des Einstellungsfensters bleibt das Dock-Symbol bestehen.
+- Der Aktivierungszustand wird zentral aus den offenen Editorfenstern abgeleitet: Nur ein offener Editor macht R3Dshot zur regulären Dock-App.
+- Das Einstellungsfenster bleibt sichtbar und aktivierbar, ohne dauerhaft ein Dock-Symbol zu erzeugen.
+- Das Schließen des letzten Editors kehrt zuverlässig zur Menüleisten-App zurück.
+- Menüpunkt „R3Dshot beenden“ und Command-Q führen durch dieselbe Abfrage: **In Menüleiste behalten**, **R3Dshot beenden** oder **Abbrechen**.
+- Beim Behalten oder vollständigen Beenden laufen Editoren weiter durch ihre bestehende Sichern-/Verwerfen-/Abbrechen-Abfrage; Änderungen werden nicht stillschweigend verworfen.
 
-Wiederherzustellender Zielzustand:
+### Phase 2: Zuschneiden
 
-- Einstellungen öffnen sich sofort als sichtbares Fenster.
-- Allein das Einstellungsfenster aktiviert kein dauerhaftes Dock-Symbol.
-- Nach dem Schließen der Einstellungen läuft R3Dshot ausschließlich als Menüleisten-App weiter.
-- Ein Dock-Symbol erscheint nur, solange mindestens ein Editorfenster geöffnet ist.
-- Nach dem letzten Editorfenster kehrt die App zuverlässig in den reinen Menüleistenmodus zurück.
-
-### 2. Sicherheitsabfrage beim Beenden
-
-„Beenden“ und Command-Q dürfen R3Dshot nicht mehr ohne Rückfrage vollständig schließen.
-
-Die Abfrage soll verständlich anbieten:
-
-- **In Menüleiste behalten** – bevorzugte Standardaktion; R3Dshot läuft ohne aktive Dock-App weiter.
-- **R3Dshot beenden** – beendet die Anwendung vollständig.
-- **Abbrechen** – lässt den aktuellen Zustand unverändert.
-
-Offene Editorfenster mit ungesicherten Änderungen müssen weiterhin ihre vorhandene Sicherungsabfrage erhalten; keine Auswahl der neuen Beenden-Abfrage darf Änderungen stillschweigend verwerfen.
+- Crop bleibt ein einzelner Dokumentzustand in Bildpixeln, nicht ein Annotationselement.
+- Toolbar, Canvas-Handles, Inspector, Undo/Redo sowie Preview/PNG-Renderer werden zusammen geliefert.
+- Der Renderer exportiert den Ausschnitt in korrekter Größe und verschiebt/clipt Annotationen deterministisch.
 
 ## Bestätigter Stand
 
@@ -36,7 +26,7 @@ Offene Editorfenster mit ungesicherten Änderungen müssen weiterhin ihre vorhan
 - Das native Fadenkreuz der Bereichsauswahl funktioniert.
 - Rechteck, Ellipse, Pfeil/Linie, Schwärzung und Marker funktionieren im Editor.
 - Der Marker unterstützt Freihandzeichnen und automatisches horizontales Einrasten.
-- Modell-/Renderer-Smoke-Test und signierter lokaler Build waren nach der letzten Änderung erfolgreich.
+- Modell-/Renderer-Smoke-Test und signierter lokaler Build sind für den Initialstand und Phase 1 erfolgreich.
 
 ## Lokale Prüfung
 
@@ -48,4 +38,3 @@ Offene Editorfenster mit ungesicherten Änderungen müssen weiterhin ihre vorhan
 Test-App:
 
 `/Volumes/Media/codex/R3Dshot/build/DerivedData/Build/Products/Debug/R3Dshot.app`
-

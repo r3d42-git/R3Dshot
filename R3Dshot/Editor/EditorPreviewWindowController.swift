@@ -77,6 +77,25 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
         activateApplication()
     }
 
+    /// Closes every editor through the normal window-delegate path. This keeps
+    /// the existing save/discard prompt authoritative and never discards an
+    /// unsaved document just because the app returns to the menu bar.
+    @discardableResult
+    func closeAllEditors() -> Bool {
+        let windows = editors.values.map(\.window)
+        for window in windows {
+            guard editors.values.contains(where: { $0.window === window }) else {
+                continue
+            }
+
+            window.performClose(nil)
+            if editors.values.contains(where: { $0.window === window }) {
+                return false
+            }
+        }
+        return true
+    }
+
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard let editor = editors.values.first(where: { $0.window === sender }),
               editor.store.hasUnsavedChanges
@@ -109,10 +128,6 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
             lastActiveEditorID = editors.keys.first
         }
         onEditorsChanged()
-
-        if editors.isEmpty {
-            NSApp.setActivationPolicy(.accessory)
-        }
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
@@ -123,7 +138,6 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
     }
 
     private func activateApplication() {
-        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
     }
 

@@ -6,12 +6,16 @@ import SwiftUI
 /// command: status-item applications do not have a regular app menu to route
 /// that command through reliably.
 @MainActor
-final class SettingsWindowController: NSWindowController {
+final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+    private let onVisibilityChanged: (Bool) -> Void
+
     init(
         preferences: PreferencesStore,
         shortcuts: ShortcutStore,
-        onShortcutRecordingChanged: @escaping (Bool) -> Void
+        onShortcutRecordingChanged: @escaping (Bool) -> Void,
+        onVisibilityChanged: @escaping (Bool) -> Void
     ) {
+        self.onVisibilityChanged = onVisibilityChanged
         let contentView = SettingsView(
             preferences: preferences,
             shortcuts: shortcuts,
@@ -30,6 +34,7 @@ final class SettingsWindowController: NSWindowController {
         window.center()
 
         super.init(window: window)
+        window.delegate = self
     }
 
     @available(*, unavailable)
@@ -39,7 +44,12 @@ final class SettingsWindowController: NSWindowController {
 
     func open() {
         showWindow(nil)
+        onVisibilityChanged(true)
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onVisibilityChanged(false)
     }
 }

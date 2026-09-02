@@ -14,7 +14,7 @@ Phase 2 ist umgesetzt und Phase 3 hat begonnen. Der lauffähige Build umfasst di
 
 Der Editor ist ebenfalls nutzbar: Screenshots werden in normalen, unabhängigen Editorfenstern geöffnet; Rechtecke, Ellipsen, Pfeile, Marker und Schwärzungen lassen sich nicht-destruktiv erstellen, auswählen, verschieben, skalieren bzw. über ihre Endpunkte anpassen, gestalten, duplizieren, anordnen und löschen. Undo/Redo, Zoom, Inspector sowie das Speichern und Kopieren des gerenderten Ergebnisses sind verbunden. Weitere Werkzeuge folgen schrittweise auf derselben Dokument- und Renderer-Basis.
 
-Die verbindliche nächste Aufgabe ist in [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) festgehalten: Zuerst wird die Dock-/Menüleisten-Lifecycle-Regression behoben und eine Sicherheitsabfrage für „Beenden“ ergänzt; erst danach folgen weitere Werkzeuge.
+Die Dock-/Menüleisten-Lifecycle-Regression und die Sicherheitsabfrage für „Beenden“ sind behoben. Die verbindliche nächste Aufgabe steht in [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md): das nicht-destruktive Zuschneiden als nächster vollständiger Editorpfad.
 
 ## Lokal bauen und starten
 
