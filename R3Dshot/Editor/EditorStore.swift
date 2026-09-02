@@ -3,6 +3,7 @@ import Observation
 
 enum EditorTool: String, CaseIterable, Identifiable {
     case select
+    case crop
     case rectangle
     case ellipse
     case arrow
@@ -14,6 +15,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .select: "Auswahl"
+        case .crop: "Zuschneiden"
         case .rectangle: "Rechteck"
         case .ellipse: "Ellipse"
         case .arrow: "Pfeil"
@@ -25,6 +27,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .select: "arrow.up.left"
+        case .crop: "crop"
         case .rectangle: "rectangle"
         case .ellipse: "circle"
         case .arrow: "arrow.up.right"
@@ -36,6 +39,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
     var helpText: String {
         switch self {
         case .select: "Auswahlwerkzeug – Elemente auswählen, verschieben und skalieren"
+        case .crop: "Zuschneiden – den sichtbaren Bildausschnitt aufziehen oder anpassen"
         case .rectangle: "Rechteckwerkzeug – ein Rechteck aufziehen"
         case .ellipse: "Ellipsenwerkzeug – eine Ellipse aufziehen"
         case .arrow: "Pfeilwerkzeug – vom Startpunkt zur Pfeilspitze ziehen"
@@ -122,9 +126,41 @@ final class EditorStore {
         lastSavedDocument != document
     }
 
+    var cropBounds: CanvasRect {
+        document.crop.boundsInCanvasPixels
+    }
+
     func markSaved(at url: URL) {
         savedURL = url
         lastSavedDocument = document
+    }
+
+    func previewCrop(_ bounds: CanvasRect) {
+        document.crop = CropState(boundsInCanvasPixels: bounds)
+            .clamped(to: document.original.pixelSize)
+    }
+
+    func commitCropChange(from originalCrop: CropState, actionName: String) {
+        guard document.crop != originalCrop else { return }
+        var previous = document
+        previous.crop = originalCrop
+        registerChange(from: previous, to: document, actionName: actionName)
+    }
+
+    func setCrop(_ bounds: CanvasRect) {
+        let crop = CropState(boundsInCanvasPixels: bounds)
+            .clamped(to: document.original.pixelSize)
+        perform(actionName: "Bild zuschneiden") {
+            document.crop = crop
+            activeTool = .select
+        }
+    }
+
+    func resetCrop() {
+        let fullCrop = CropState.fullImage(document.original.pixelSize)
+        perform(actionName: "Zuschneiden zurücksetzen") {
+            document.crop = fullCrop
+        }
     }
 
     func insertRectangle(in bounds: CanvasRect) {

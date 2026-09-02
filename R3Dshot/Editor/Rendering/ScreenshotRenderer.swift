@@ -22,7 +22,12 @@ enum ScreenshotRenderer {
     }
 
     static func render(document: ScreenshotDocument, originalImage: CGImage) throws -> CGImage {
-        let pixelSize = document.original.pixelSize
+        let sourcePixelSize = document.original.pixelSize
+        let crop = document.crop.clamped(to: sourcePixelSize).boundsInCanvasPixels.cgRect
+        let pixelSize = PixelSize(
+            width: max(1, Int(crop.width.rounded())),
+            height: max(1, Int(crop.height.rounded()))
+        )
         let colorSpace = originalImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         guard let context = CGContext(
             data: nil,
@@ -38,13 +43,20 @@ enum ScreenshotRenderer {
 
         let canvasRect = CGRect(origin: .zero, size: pixelSize.cgSize)
         context.interpolationQuality = .none
-        context.draw(originalImage, in: canvasRect)
+        context.saveGState()
+        context.clip(to: canvasRect)
+        context.translateBy(
+            x: -crop.minX,
+            y: -(sourcePixelSize.cgSize.height - crop.maxY)
+        )
+        context.draw(originalImage, in: CGRect(origin: .zero, size: sourcePixelSize.cgSize))
         drawAnnotations(
             document.elements,
             in: context,
-            canvasHeight: pixelSize.cgSize.height,
+            canvasHeight: sourcePixelSize.cgSize.height,
             coordinateOrigin: .bottomLeft
         )
+        context.restoreGState()
 
         guard let image = context.makeImage() else {
             throw RenderingError.couldNotCreateImage

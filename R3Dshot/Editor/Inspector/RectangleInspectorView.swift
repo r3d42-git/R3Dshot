@@ -6,7 +6,23 @@ struct RectangleInspectorView: View {
 
     var body: some View {
         Group {
-            if let style = store.selectedShapeStyle {
+            if store.activeTool == .crop {
+                Form {
+                    Section("Zuschneiden") {
+                        LabeledContent("Größe") {
+                            Text("\(Int(store.cropBounds.width)) × \(Int(store.cropBounds.height)) px")
+                                .monospacedDigit()
+                        }
+                        Text("Ziehe auf der Arbeitsfläche einen neuen Ausschnitt auf oder verschiebe die vier Griffe.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Gesamtes Bild wiederherstellen") {
+                            store.resetCrop()
+                        }
+                    }
+                }
+                .formStyle(.grouped)
+            } else if let style = store.selectedShapeStyle {
                 Form {
                     Section(store.selectedShapeTitle ?? "Form") {
                         ColorPicker(

@@ -147,6 +147,10 @@ struct OriginalImageReference: Codable, Equatable, Sendable {
 struct CropState: Codable, Equatable, Sendable {
     var boundsInCanvasPixels: CanvasRect
 
+    func clamped(to size: PixelSize) -> CropState {
+        CropState(boundsInCanvasPixels: boundsInCanvasPixels.clamped(to: size, minimumSize: 4))
+    }
+
     static func fullImage(_ size: PixelSize) -> CropState {
         CropState(
             boundsInCanvasPixels: CanvasRect(

@@ -4,7 +4,7 @@ Stand: 2. September 2026
 
 ## Als Nächstes
 
-Phase 1 ist abgeschlossen. Als Nächstes folgt Phase 2: ein nicht-destruktiver Crop-Werkzeugpfad.
+Phase 2 ist abgeschlossen. Als Nächstes folgt Phase 3: ein nicht-destruktives Text-Element.
 
 ### Erledigt: App-Lifecycle und sicheres Beenden
 
@@ -16,9 +16,12 @@ Phase 1 ist abgeschlossen. Als Nächstes folgt Phase 2: ein nicht-destruktiver C
 
 ### Phase 2: Zuschneiden
 
-- Crop bleibt ein einzelner Dokumentzustand in Bildpixeln, nicht ein Annotationselement.
-- Toolbar, Canvas-Handles, Inspector, Undo/Redo sowie Preview/PNG-Renderer werden zusammen geliefert.
-- Der Renderer exportiert den Ausschnitt in korrekter Größe und verschiebt/clipt Annotationen deterministisch.
+Erledigt: Crop bleibt ein einzelner Dokumentzustand in Bildpixeln, nicht ein Annotationselement. Toolbar, Canvas-Griffe, Inspector, Undo/Redo sowie Preview/PNG-Renderer sind verbunden. Der Renderer exportiert den Ausschnitt in korrekter Größe und verschiebt/clipt Annotationen deterministisch.
+
+### Phase 3: Text
+
+- Text erhält ein codierbares Element mit Inhalt, Systemschrift, Größe, Farbe und Ausrichtung.
+- Direkte Bearbeitung, Inspector, Renderer, Auswahl, Skalierung sowie Copy/Paste sind Teil derselben Phase.
 
 ## Bestätigter Stand
 

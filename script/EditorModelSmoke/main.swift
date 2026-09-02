@@ -113,6 +113,17 @@ try require(decoded == document, "ScreenshotDocument Codable round-trip failed")
 
 let rendered = try ScreenshotRenderer.render(document: document, originalImage: original)
 try require(rendered.width == 64 && rendered.height == 48, "Renderer changed output dimensions")
+
+document.crop = CropState(
+    boundsInCanvasPixels: CanvasRect(x: 8, y: 6, width: 40, height: 30)
+)
+let cropped = try ScreenshotRenderer.render(document: document, originalImage: original)
+try require(cropped.width == 40 && cropped.height == 30, "Renderer did not export crop dimensions")
+try require(
+    document.crop.boundsInCanvasPixels == CanvasRect(x: 8, y: 6, width: 40, height: 30),
+    "Renderer changed the document crop"
+)
+
 try require(
     original.dataProvider?.data as Data? == originalBytesBefore,
     "Renderer modified the original image"

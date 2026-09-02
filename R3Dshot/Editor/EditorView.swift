@@ -63,6 +63,15 @@ struct EditorView: View {
                 .labelStyle(.iconOnly)
             }
 
+            if store.activeTool == .crop {
+                ToolbarItem(placement: .automatic) {
+                    Button("Zuschnitt zurücksetzen") {
+                        store.resetCrop()
+                    }
+                    .help("Den gesamten Originalausschnitt wiederherstellen")
+                }
+            }
+
             ToolbarItemGroup(placement: .automatic) {
                 Button {
                     store.undoManager.undo()

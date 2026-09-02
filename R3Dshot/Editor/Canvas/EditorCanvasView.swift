@@ -12,7 +12,17 @@ struct EditorCanvasView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let canvasSize = store.document.original.pixelSize
+            let isCropping = store.activeTool == .crop
+            let previewDocument = displayDocument(isCropping: isCropping)
+            let previewImage = try? ScreenshotRenderer.render(
+                document: previewDocument,
+                originalImage: store.session.originalImage
+            )
+            let crop = previewDocument.crop.boundsInCanvasPixels
+            let canvasSize = PixelSize(
+                width: max(1, Int(crop.width.rounded())),
+                height: max(1, Int(crop.height.rounded()))
+            )
             let availableWidth = max(80, geometry.size.width - 64)
             let availableHeight = max(80, geometry.size.height - 64)
             let fittedScale = min(
@@ -20,7 +30,11 @@ struct EditorCanvasView: View {
                 availableHeight / max(1, canvasSize.cgSize.height)
             )
             let scale = max(0.01, fittedScale * store.zoom)
-            let transform = CanvasTransform(canvasSize: canvasSize, scale: scale)
+            let transform = CanvasTransform(
+                canvasSize: canvasSize,
+                scale: scale,
+                canvasOrigin: CGPoint(x: crop.x, y: crop.y)
+            )
             let surfaceSize = CGSize(
                 width: canvasSize.cgSize.width * scale,
                 height: canvasSize.cgSize.height * scale
@@ -29,7 +43,12 @@ struct EditorCanvasView: View {
             ScrollView([.horizontal, .vertical]) {
                 ZStack {
                     Color.clear
-                    editorSurface(size: surfaceSize, transform: transform)
+                    editorSurface(
+                        size: surfaceSize,
+                        previewImage: previewImage,
+                        transform: transform,
+                        showsCropControls: isCropping
+                    )
                 }
                 .frame(
                     width: max(geometry.size.width, surfaceSize.width + 64),
@@ -41,15 +60,19 @@ struct EditorCanvasView: View {
         }
     }
 
-    private func editorSurface(size: CGSize, transform: CanvasTransform) -> some View {
+    private func editorSurface(
+        size: CGSize,
+        previewImage: CGImage?,
+        transform: CanvasTransform,
+        showsCropControls: Bool
+    ) -> some View {
         ZStack(alignment: .topLeading) {
-            Image(nsImage: NSImage(cgImage: store.session.originalImage, size: .zero))
-                .resizable()
-                .interpolation(.high)
-                .frame(width: size.width, height: size.height)
-
-            AnnotationCanvas(document: store.document)
-                .frame(width: size.width, height: size.height)
+            if let previewImage {
+                Image(nsImage: NSImage(cgImage: previewImage, size: .zero))
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: size.width, height: size.height)
+            }
 
             if let interaction,
                case .createMarker = interaction.mode,
@@ -100,7 +123,9 @@ struct EditorCanvasView: View {
                 .allowsHitTesting(false)
             }
 
-            if let selectedElement = store.selectedElement {
+            if showsCropControls {
+                CropSelectionHandles(store: store, transform: transform)
+            } else if let selectedElement = store.selectedElement {
                 SelectionHandles(
                     store: store,
                     element: selectedElement,
@@ -116,6 +141,13 @@ struct EditorCanvasView: View {
         .accessibilityLabel("Screenshot-Arbeitsfläche")
     }
 
+    private func displayDocument(isCropping: Bool) -> ScreenshotDocument {
+        guard isCropping else { return store.document }
+        var document = store.document
+        document.crop = .fullImage(document.original.pixelSize)
+        return document
+    }
+
     private func surfaceGesture(transform: CanvasTransform) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(CanvasCoordinateSpace.name))
             .onChanged { value in
@@ -127,7 +159,7 @@ struct EditorCanvasView: View {
 
                 guard let interaction else { return }
                 switch interaction.mode {
-                case .createRectangle, .createEllipse, .createRedaction:
+                case .createRectangle, .createEllipse, .createRedaction, .createCrop:
                     draftBounds = CanvasRect(
                         CGRect(
                             x: interaction.startPoint.x,
@@ -199,6 +231,10 @@ struct EditorCanvasView: View {
                     }
                 case .createMarker:
                     store.insertMarker(points: draftMarkerPoints)
+                case .createCrop:
+                    if let draftBounds, draftBounds.width >= 4, draftBounds.height >= 4 {
+                        store.setCrop(draftBounds)
+                    }
                 case .move:
                     if let elementID = interaction.elementID,
                        let originalBounds = interaction.originalBounds {
@@ -254,6 +290,13 @@ struct EditorCanvasView: View {
             markerDrawingMode = .undecided
             interaction = CanvasInteraction(
                 mode: .createMarker,
+                startPoint: point,
+                elementID: nil,
+                originalBounds: nil
+            )
+        case .crop:
+            interaction = CanvasInteraction(
+                mode: .createCrop,
                 startPoint: point,
                 elementID: nil,
                 originalBounds: nil
@@ -327,6 +370,7 @@ private struct CanvasInteraction {
         case createArrow
         case createRedaction
         case createMarker
+        case createCrop
         case move
         case idle
     }
@@ -345,6 +389,75 @@ private enum MarkerDrawingMode {
     case undecided
     case horizontal
     case freehand
+}
+
+private struct CropSelectionHandles: View {
+    let store: EditorStore
+    let transform: CanvasTransform
+
+    var body: some View {
+        let rect = transform.viewRect(from: store.cropBounds)
+
+        ZStack(alignment: .topLeading) {
+            Rectangle()
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [7, 4]))
+                .frame(width: rect.width, height: rect.height)
+                .offset(x: rect.minX, y: rect.minY)
+                .allowsHitTesting(false)
+
+            ForEach(ResizeCorner.allCases) { corner in
+                CropResizeHandle(
+                    store: store,
+                    corner: corner,
+                    transform: transform
+                )
+                .position(corner.position(in: rect))
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Zuschnitt anpassen")
+    }
+}
+
+private struct CropResizeHandle: View {
+    let store: EditorStore
+    let corner: ResizeCorner
+    let transform: CanvasTransform
+
+    @State private var originalCrop: CropState?
+
+    var body: some View {
+        Circle()
+            .fill(.background)
+            .stroke(Color.accentColor, lineWidth: 2)
+            .frame(width: 12, height: 12)
+            .contentShape(Rectangle().inset(by: -6))
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .named(CanvasCoordinateSpace.name))
+                    .onChanged { value in
+                        if originalCrop == nil {
+                            originalCrop = store.document.crop
+                        }
+                        guard let originalCrop else { return }
+                        store.previewCrop(
+                            corner.resized(
+                                originalCrop.boundsInCanvasPixels,
+                                to: transform.canvasPoint(from: value.location)
+                            )
+                        )
+                    }
+                    .onEnded { _ in
+                        if let originalCrop {
+                            store.commitCropChange(
+                                from: originalCrop,
+                                actionName: "Zuschnitt anpassen"
+                            )
+                        }
+                        originalCrop = nil
+                    }
+            )
+            .help("Zuschnitt skalieren")
+    }
 }
 
 private struct SelectionHandles: View {
