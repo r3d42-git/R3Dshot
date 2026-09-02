@@ -477,6 +477,47 @@ struct RectangleInspectorView: View {
                     }
                     Section("Anordnung") { arrangementControls }
                 }.formStyle(.grouped)
+            } else if let style = store.selectedPixelateStyle {
+                Form {
+                    Section("Pixelierung") {
+                        LabeledContent("Pixelgröße") {
+                            HStack {
+                                Slider(value: valueBinding(get: { style.blockSize }, set: { value in
+                                    var updated = style
+                                    updated.blockSize = value
+                                    store.setSelectedPixelateStyle(updated, actionName: "Pixelgröße ändern")
+                                }), in: 2...80, step: 1)
+                                Text("\(Int(style.blockSize)) px")
+                                    .monospacedDigit()
+                                    .frame(width: 48, alignment: .trailing)
+                            }
+                        }
+                    }
+                    Section("Anordnung") { arrangementControls }
+                }
+                .formStyle(.grouped)
+            } else if let style = store.selectedFocusStyle {
+                Form {
+                    Section("Fokus") {
+                        LabeledContent("Weichzeichner") {
+                            HStack {
+                                Slider(value: valueBinding(get: { style.blurRadius }, set: { value in
+                                    var updated = style
+                                    updated.blurRadius = value
+                                    store.setSelectedFocusStyle(updated, actionName: "Weichzeichner ändern")
+                                }), in: 1...80, step: 1)
+                                Text("\(Int(style.blurRadius)) px")
+                                    .monospacedDigit()
+                                    .frame(width: 48, alignment: .trailing)
+                            }
+                        }
+                        Text("Der markierte Bereich bleibt scharf; die bestehende Komposition außerhalb wird weichgezeichnet.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Section("Anordnung") { arrangementControls }
+                }
+                .formStyle(.grouped)
             } else {
                 ContentUnavailableView(
                     "Keine Auswahl",

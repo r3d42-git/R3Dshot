@@ -141,6 +141,14 @@ struct StepNumberStyle: Codable, Equatable, Sendable {
     var fontSize: CGFloat = 24
 }
 
+struct PixelateStyle: Codable, Equatable, Sendable {
+    var blockSize: CGFloat = 14
+}
+
+struct FocusStyle: Codable, Equatable, Sendable {
+    var blurRadius: CGFloat = 18
+}
+
 enum AnnotationPayload: Codable, Equatable, Sendable {
     case rectangle(ShapeStyle)
     case ellipse(ShapeStyle)
@@ -150,6 +158,8 @@ enum AnnotationPayload: Codable, Equatable, Sendable {
     case text(TextStyle)
     case speechBubble(SpeechBubbleStyle)
     case stepNumber(StepNumberStyle)
+    case pixelate(PixelateStyle)
+    case focus(FocusStyle)
 }
 
 struct AnnotationElement: Identifiable, Codable, Equatable, Sendable {

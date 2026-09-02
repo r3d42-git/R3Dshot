@@ -12,6 +12,8 @@ enum EditorTool: String, CaseIterable, Identifiable {
     case text
     case speechBubble
     case stepNumber
+    case pixelate
+    case focus
 
     var id: String { rawValue }
 
@@ -27,6 +29,8 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .text: "Text"
         case .speechBubble: "Sprechblase"
         case .stepNumber: "Schritt"
+        case .pixelate: "Pixelieren"
+        case .focus: "Fokus"
         }
     }
 
@@ -42,6 +46,8 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .text: "text.cursor"
         case .speechBubble: "text.bubble"
         case .stepNumber: "1.circle"
+        case .pixelate: "square.grid.3x3"
+        case .focus: "viewfinder"
         }
     }
 
@@ -57,6 +63,8 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .text: "Text – einen editierbaren Textbereich aufziehen"
         case .speechBubble: "Sprechblase – einen beschrifteten Hinweis aufziehen"
         case .stepNumber: "Schritt – eine nummerierte Markierung aufziehen"
+        case .pixelate: "Pixelieren – einen Bereich nicht-destruktiv verpixeln"
+        case .focus: "Fokus – markierten Bereich scharf hervorheben"
         }
     }
 }
@@ -99,7 +107,7 @@ final class EditorStore {
     var selectedShapeStyle: ShapeStyle? {
         switch selectedElement?.payload {
         case let .rectangle(style), let .ellipse(style): style
-        case .arrow, .redaction, .marker, .text, .speechBubble, .stepNumber, nil: nil
+        case .arrow, .redaction, .marker, .text, .speechBubble, .stepNumber, .pixelate, .focus, nil: nil
         }
     }
 
@@ -113,6 +121,8 @@ final class EditorStore {
         case .text: "Text"
         case .speechBubble: "Sprechblase"
         case .stepNumber: "Schritt"
+        case .pixelate: "Pixelierung"
+        case .focus: "Fokus"
         case nil: nil
         }
     }
@@ -149,6 +159,16 @@ final class EditorStore {
 
     var selectedStepNumberStyle: StepNumberStyle? {
         guard case let .stepNumber(style)? = selectedElement?.payload else { return nil }
+        return style
+    }
+
+    var selectedPixelateStyle: PixelateStyle? {
+        guard case let .pixelate(style)? = selectedElement?.payload else { return nil }
+        return style
+    }
+
+    var selectedFocusStyle: FocusStyle? {
+        guard case let .focus(style)? = selectedElement?.payload else { return nil }
         return style
     }
 
@@ -333,6 +353,30 @@ final class EditorStore {
         }
     }
 
+    func insertPixelate(in bounds: CanvasRect) {
+        insertEffect(in: bounds, payload: .pixelate(PixelateStyle()), actionName: "Pixelierung hinzufügen")
+    }
+
+    func insertFocus(in bounds: CanvasRect) {
+        insertEffect(in: bounds, payload: .focus(FocusStyle()), actionName: "Fokus hinzufügen")
+    }
+
+    private func insertEffect(in bounds: CanvasRect, payload: AnnotationPayload, actionName: String) {
+        let clamped = bounds.clamped(to: document.original.pixelSize, minimumSize: 12)
+        guard clamped.width >= 12, clamped.height >= 12 else { return }
+
+        perform(actionName: actionName) {
+            let element = AnnotationElement(
+                zIndex: nextZIndex,
+                transform: ElementTransform(boundsInCanvasPixels: clamped),
+                payload: payload
+            )
+            document.elements.append(element)
+            selectedElementID = element.id
+            activeTool = .select
+        }
+    }
+
     func selectElement(at point: CGPoint, tolerance: CGFloat = 5) {
         selectedElementID = document.elements
             .sorted { $0.zIndex > $1.zIndex }
@@ -467,6 +511,7 @@ final class EditorStore {
                 break
             case .speechBubble, .stepNumber:
                 break
+            case .pixelate, .focus: break
             }
         }
     }
@@ -517,6 +562,26 @@ final class EditorStore {
         perform(actionName: actionName) { document.elements[index].payload = .stepNumber(style) }
     }
 
+    func setSelectedPixelateStyle(_ style: PixelateStyle, actionName: String) {
+        guard let selectedElementID,
+              let index = index(of: selectedElementID),
+              case .pixelate = document.elements[index].payload
+        else { return }
+        perform(actionName: actionName) {
+            document.elements[index].payload = .pixelate(style)
+        }
+    }
+
+    func setSelectedFocusStyle(_ style: FocusStyle, actionName: String) {
+        guard let selectedElementID,
+              let index = index(of: selectedElementID),
+              case .focus = document.elements[index].payload
+        else { return }
+        perform(actionName: actionName) {
+            document.elements[index].payload = .focus(style)
+        }
+    }
+
     func copySelection() {
         guard let selectedElement,
               let data = try? JSONEncoder().encode(selectedElement)
@@ -557,7 +622,7 @@ final class EditorStore {
         tolerance: CGFloat
     ) -> Bool {
         switch element.payload {
-        case .rectangle, .ellipse, .redaction, .text, .speechBubble, .stepNumber:
+        case .rectangle, .ellipse, .redaction, .text, .speechBubble, .stepNumber, .pixelate, .focus:
             return element.transform.boundsInCanvasPixels.cgRect
                 .insetBy(dx: -tolerance, dy: -tolerance)
                 .contains(point)

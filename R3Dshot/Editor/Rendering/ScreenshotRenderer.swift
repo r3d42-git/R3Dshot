@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreImage
 import CoreText
 import Foundation
 
@@ -200,6 +201,10 @@ enum ScreenshotRenderer {
             context.setFillColor(style.fillColor.cgColor)
             context.fillEllipse(in: drawingBounds)
             drawText(TextStyle(text: "\(style.number)", color: style.textColor, fontSize: style.fontSize, alignment: .center), in: drawingBounds.insetBy(dx: 3, dy: 3), context: context)
+        case let .pixelate(style):
+            applyPixelation(blockSize: style.blockSize, in: drawingBounds, context: context)
+        case let .focus(style):
+            applyFocus(radius: style.blurRadius, keeping: drawingBounds, context: context)
         }
     }
 
@@ -256,6 +261,53 @@ enum ScreenshotRenderer {
         drawText(style.textStyle, in: bounds.insetBy(dx: 12, dy: 10), context: context)
     }
 
+    private static func applyPixelation(blockSize: CGFloat, in bounds: CGRect, context: CGContext) {
+        guard let snapshot = context.makeImage() else { return }
+        let input = CIImage(cgImage: snapshot)
+        guard let filter = CIFilter(name: "CIPixellate") else { return }
+        filter.setValue(input, forKey: kCIInputImageKey)
+        filter.setValue(max(2, blockSize), forKey: kCIInputScaleKey)
+        guard let output = filter.outputImage,
+              let image = CIContext().createCGImage(output.cropped(to: input.extent), from: input.extent)
+        else { return }
+        drawEffect(image, snapshot: snapshot, clippedTo: bounds, in: context)
+    }
+
+    private static func applyFocus(radius: CGFloat, keeping bounds: CGRect, context: CGContext) {
+        guard let snapshot = context.makeImage() else { return }
+        let input = CIImage(cgImage: snapshot)
+        guard let filter = CIFilter(name: "CIGaussianBlur") else { return }
+        filter.setValue(input.clampedToExtent(), forKey: kCIInputImageKey)
+        filter.setValue(max(1, radius), forKey: kCIInputRadiusKey)
+        guard let output = filter.outputImage,
+              let blurred = CIContext().createCGImage(output.cropped(to: input.extent), from: input.extent)
+        else { return }
+
+        let snapshotBounds = snapshotBounds(for: snapshot, in: context)
+        context.draw(blurred, in: snapshotBounds)
+        context.saveGState()
+        context.clip(to: bounds)
+        context.draw(snapshot, in: snapshotBounds)
+        context.restoreGState()
+    }
+
+    private static func drawEffect(
+        _ image: CGImage,
+        snapshot: CGImage,
+        clippedTo bounds: CGRect,
+        in context: CGContext
+    ) {
+        context.saveGState()
+        context.clip(to: bounds)
+        context.draw(image, in: snapshotBounds(for: snapshot, in: context))
+        context.restoreGState()
+    }
+
+    private static func snapshotBounds(for snapshot: CGImage, in context: CGContext) -> CGRect {
+        CGRect(x: 0, y: 0, width: snapshot.width, height: snapshot.height)
+            .applying(context.ctm.inverted())
+    }
+
     private static func paragraphStyle(for alignment: AnnotationTextAlignment) -> CTParagraphStyle {
         var textAlignment: CTTextAlignment
         switch alignment {
@@ -308,6 +360,7 @@ enum ScreenshotRenderer {
         case let .text(style): style.opacity
         case .speechBubble: 1
         case .stepNumber: 1
+        case .pixelate, .focus: 1
         }
     }
 }

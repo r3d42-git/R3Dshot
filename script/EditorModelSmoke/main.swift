@@ -25,12 +25,99 @@ private func makeOriginalImage(width: Int, height: Int) throws -> CGImage {
         throw SmokeFailure.couldNotCreateImage
     }
 
-    context.setFillColor(CGColor(red: 0.1, green: 0.2, blue: 0.3, alpha: 1))
-    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    for y in 0..<height {
+        for x in 0..<width {
+            context.setFillColor(
+                CGColor(
+                    red: CGFloat((x * 29 + y * 11) % 256) / 255,
+                    green: CGFloat((x * 7 + y * 31) % 256) / 255,
+                    blue: CGFloat((x * 17 + y * 13) % 256) / 255,
+                    alpha: 1
+                )
+            )
+            context.fill(CGRect(x: x, y: y, width: 1, height: 1))
+        }
+    }
     guard let image = context.makeImage() else {
         throw SmokeFailure.couldNotCreateImage
     }
     return image
+}
+
+private func pixelBytes(_ image: CGImage) throws -> [UInt8] {
+    guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+          let context = CGContext(
+              data: nil,
+              width: image.width,
+              height: image.height,
+              bitsPerComponent: 8,
+              bytesPerRow: image.width * 4,
+              space: colorSpace,
+              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+          ),
+          let data = context.data
+    else {
+        throw SmokeFailure.couldNotCreateImage
+    }
+
+    context.translateBy(x: 0, y: CGFloat(image.height))
+    context.scaleBy(x: 1, y: -1)
+    context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+
+    return Array(
+        UnsafeBufferPointer(
+            start: data.assumingMemoryBound(to: UInt8.self),
+            count: image.width * image.height * 4
+        )
+    )
+}
+
+private func changedPixelCount(
+    between first: CGImage,
+    and second: CGImage,
+    in bounds: CanvasRect
+) throws -> Int {
+    try require(first.width == second.width && first.height == second.height, "Compared images have different dimensions")
+    let firstBytes = try pixelBytes(first)
+    let secondBytes = try pixelBytes(second)
+    let imageBounds = CGRect(x: 0, y: 0, width: first.width, height: first.height)
+    let inspected = bounds.cgRect.integral.intersection(imageBounds)
+    guard !inspected.isNull else { return 0 }
+
+    var changed = 0
+    for y in Int(inspected.minY)..<Int(inspected.maxY) {
+        for x in Int(inspected.minX)..<Int(inspected.maxX) {
+            let offset = (y * first.width + x) * 4
+            if firstBytes[offset..<(offset + 4)] != secondBytes[offset..<(offset + 4)] {
+                changed += 1
+            }
+        }
+    }
+    return changed
+}
+
+private func changedPixelCountOutside(
+    between first: CGImage,
+    and second: CGImage,
+    excluding bounds: CanvasRect
+) throws -> Int {
+    try require(first.width == second.width && first.height == second.height, "Compared images have different dimensions")
+    let firstBytes = try pixelBytes(first)
+    let secondBytes = try pixelBytes(second)
+    let excluded = bounds.cgRect
+
+    var changed = 0
+    for y in 0..<first.height {
+        for x in 0..<first.width where !excluded.contains(
+            CGPoint(x: CGFloat(x) + 0.5, y: CGFloat(y) + 0.5)
+        ) {
+            let offset = (y * first.width + x) * 4
+            if firstBytes[offset..<(offset + 4)] != secondBytes[offset..<(offset + 4)] {
+                changed += 1
+            }
+        }
+    }
+    return changed
 }
 
 let original = try makeOriginalImage(width: 64, height: 48)
@@ -138,5 +225,96 @@ try require(
     "Renderer modified the original image"
 )
 try require(document.elements.map(\.zIndex) == [1, 0, 2, 3, 4, 5, 6], "Renderer reordered document elements")
+
+var effectDocument = ScreenshotDocument(captureID: UUID(), image: original)
+effectDocument.crop = CropState(
+    boundsInCanvasPixels: CanvasRect(x: 8, y: 6, width: 40, height: 30)
+)
+let effectBaseline = try ScreenshotRenderer.render(document: effectDocument, originalImage: original)
+let effectBounds = CanvasRect(x: 16, y: 14, width: 16, height: 12)
+let croppedEffectBounds = CanvasRect(
+    x: effectBounds.x - effectDocument.crop.boundsInCanvasPixels.x,
+    y: effectDocument.crop.boundsInCanvasPixels.cgRect.maxY - effectBounds.cgRect.maxY,
+    width: effectBounds.width,
+    height: effectBounds.height
+)
+
+var pixelatedDocument = effectDocument
+pixelatedDocument.elements = [
+    AnnotationElement(
+        zIndex: 0,
+        transform: ElementTransform(boundsInCanvasPixels: effectBounds),
+        payload: .pixelate(PixelateStyle(blockSize: 6))
+    )
+]
+let copiedPixelate = try JSONDecoder().decode(
+    AnnotationElement.self,
+    from: JSONEncoder().encode(pixelatedDocument.elements[0])
+)
+try require(
+    copiedPixelate == pixelatedDocument.elements[0],
+    "Pixelation annotation Codable round-trip failed"
+)
+let pixelated = try ScreenshotRenderer.render(document: pixelatedDocument, originalImage: original)
+let pixelatedChangedInside = try changedPixelCount(
+    between: pixelated,
+    and: effectBaseline,
+    in: croppedEffectBounds
+)
+try require(
+    pixelatedChangedInside > 0,
+    "Pixelation did not alter pixels inside its selected area"
+)
+let pixelatedChangedOutside = try changedPixelCountOutside(
+    between: pixelated,
+    and: effectBaseline,
+    excluding: croppedEffectBounds
+)
+try require(
+    pixelatedChangedOutside == 0,
+    "Pixelation changed pixels outside its selected area"
+)
+
+var focusedDocument = effectDocument
+focusedDocument.elements = [
+    AnnotationElement(
+        zIndex: 0,
+        transform: ElementTransform(boundsInCanvasPixels: effectBounds),
+        payload: .focus(FocusStyle(blurRadius: 8))
+    )
+]
+let copiedFocus = try JSONDecoder().decode(
+    AnnotationElement.self,
+    from: JSONEncoder().encode(focusedDocument.elements[0])
+)
+try require(
+    copiedFocus == focusedDocument.elements[0],
+    "Focus annotation Codable round-trip failed"
+)
+let focused = try ScreenshotRenderer.render(document: focusedDocument, originalImage: original)
+let sharpInterior = CanvasRect(
+    x: croppedEffectBounds.x + 2,
+    y: croppedEffectBounds.y + 2,
+    width: croppedEffectBounds.width - 4,
+    height: croppedEffectBounds.height - 4
+)
+let focusedChangedInside = try changedPixelCount(
+    between: focused,
+    and: effectBaseline,
+    in: sharpInterior
+)
+try require(
+    focusedChangedInside == 0,
+    "Focus blurred pixels inside its selected area"
+)
+let focusedChangedOutside = try changedPixelCountOutside(
+    between: focused,
+    and: effectBaseline,
+    excluding: croppedEffectBounds
+)
+try require(
+    focusedChangedOutside > 0,
+    "Focus did not blur pixels outside its selected area"
+)
 
 print("Editor model/renderer smoke test passed")

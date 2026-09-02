@@ -159,7 +159,7 @@ struct EditorCanvasView: View {
 
                 guard let interaction else { return }
                 switch interaction.mode {
-                case .createRectangle, .createEllipse, .createRedaction, .createCrop, .createText, .createSpeechBubble, .createStepNumber:
+                case .createRectangle, .createEllipse, .createRedaction, .createCrop, .createText, .createSpeechBubble, .createStepNumber, .createPixelate, .createFocus:
                     draftBounds = CanvasRect(
                         CGRect(
                             x: interaction.startPoint.x,
@@ -243,6 +243,8 @@ struct EditorCanvasView: View {
                     if let draftBounds, draftBounds.width >= 24, draftBounds.height >= 24 { store.insertSpeechBubble(in: draftBounds) }
                 case .createStepNumber:
                     if let draftBounds, draftBounds.width >= 24, draftBounds.height >= 24 { store.insertStepNumber(in: draftBounds) }
+                case .createPixelate: if let draftBounds { store.insertPixelate(in: draftBounds) }
+                case .createFocus: if let draftBounds { store.insertFocus(in: draftBounds) }
                 case .move:
                     if let elementID = interaction.elementID,
                        let originalBounds = interaction.originalBounds {
@@ -320,6 +322,8 @@ struct EditorCanvasView: View {
             interaction = CanvasInteraction(mode: .createSpeechBubble, startPoint: point, elementID: nil, originalBounds: nil)
         case .stepNumber:
             interaction = CanvasInteraction(mode: .createStepNumber, startPoint: point, elementID: nil, originalBounds: nil)
+        case .pixelate: interaction = CanvasInteraction(mode: .createPixelate, startPoint: point, elementID: nil, originalBounds: nil)
+        case .focus: interaction = CanvasInteraction(mode: .createFocus, startPoint: point, elementID: nil, originalBounds: nil)
         case .select:
             store.selectElement(at: point, tolerance: 6 / transform.scale)
             guard let selectedElement = store.selectedElement else {
@@ -393,6 +397,8 @@ private struct CanvasInteraction {
         case createText
         case createSpeechBubble
         case createStepNumber
+        case createPixelate
+        case createFocus
         case move
         case idle
     }
