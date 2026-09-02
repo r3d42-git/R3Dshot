@@ -92,15 +92,29 @@ Test-App:
 
 `/Volumes/Media/codex/R3Dshot/build/DerivedData/Build/Products/Debug/R3Dshot.app`
 
+## Release 0.1.0
+
+- Öffentliches Repository: https://github.com/r3d42-git/R3Dshot
+- Tag und Release-Commit: `v0.1.0` → `714e4cd22e0242895b0980956fbdcf75686c7d87`
+- Asset: [R3Dshot-0.1.0-mac-arm64.dmg](https://github.com/r3d42-git/R3Dshot/releases/download/v0.1.0/R3Dshot-0.1.0-mac-arm64.dmg)
+- SHA-256: `ce7f96432473de79cb7a3a7616647c5aca6731e80309a2033cdf7185c7a3ec7f`
+- Architektur und Produktidentität: `arm64`, `org.r3d.R3Dshot`, macOS 15.2 oder neuer.
+- Signatur: `Developer ID Application: Philipp John Hild (G6JH37W285)`, Hardened Runtime und sicherer Zeitstempel.
+- Apple-Notarisierung: App-ZIP `41607217-5610-42eb-9e4b-5019b5ce545c`, DMG `e3bdc13e-bcf8-487e-a5d2-33b65116dc42`; beide `Accepted`.
+- Das Ticket ist sowohl an der App vor dem Verpacken als auch am finalen DMG gestapelt. Lokaler DMG und frischer GitHub-Download bestanden `codesign`, `hdiutil verify`, `stapler validate` und Gatekeeper; die Prüfungen mounteten jeweils genau den geprüften DMG und validierten die enthaltene App.
+
 ## Commits dieses Abschlusses
 
 - `3036a5b Add pixelation and focus effects`
 - `e035d0e Improve step marker workflow`
+- `80d6817 Implement phase 7 editor workflow`
+- `7f67cd4 Add notarized DMG release workflow`
+- `714e4cd Fix release tool preflight`
 
-Der Phase-7-Arbeitsstand ist absichtlich noch nicht committet; es gab keinen Push, Release oder Notarisierung.
+Die Release-Nachweise stehen bewusst in diesem nachträglichen, dokumentationsreinen Commit; der veröffentlichte Tag bleibt auf `714e4cd`.
 
 ## Noch offen
 
-- Vor einer Veröffentlichung: erneute physische Abnahme der Bereichs-, Fenster- und Bildschirmaufnahme auf den vorgesehenen Displays. Phase 7 ändert keine Hardware-Erkennung; die bestehenden Capture-Workflows waren bereits bestätigt.
-- Manuelle Editorabnahme von Phase 7: ⌘-Mehrfachauswahl samt Gruppenverschieben, gemeinsame Schrittform bei mehreren Markern, die drei Schrittformen, Start bei einer gewählten Zahl sowie alle Crop-Verhältnisse anlegen und an den Griffen skalieren.
-- Keine Veröffentlichung, kein GitHub-Push und keine Notarisierung wurden durchgeführt.
+- Physische Nachabnahme der Bereichs-, Fenster- und Bildschirmaufnahme auf den vorgesehenen Displays. Phase 7 ändert keine Hardware-Erkennung; die bestehenden Capture-Workflows waren bereits bestätigt.
+- Manuelle Phase-7-Abnahme: ⌘-Mehrfachauswahl samt Gruppenverschieben, gemeinsame Schrittform bei mehreren Markern, die drei Schrittformen, Start bei einer gewählten Zahl sowie alle Crop-Verhältnisse anlegen und an den Griffen skalieren.
+- Ein Clean-Machine-Start des frisch aus GitHub geladenen DMG wurde nicht durchgeführt. Die notarisierten Container- und Gatekeeper-Prüfungen des lokalen und heruntergeladenen DMG sind dagegen vollständig erfolgt.
