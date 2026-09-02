@@ -73,8 +73,8 @@ if [[ "$app_bundle_id" != "$BUNDLE_ID" || "$app_version" != "$VERSION" || "$app_
   echo "The contained app does not match its expected bundle metadata or arm64 architecture." >&2
   exit 1
 fi
-if ! printf '%s\n' "$app_signing_info" | /usr/bin/rg -qF "TeamIdentifier=$TEAM_ID" \
-  || ! printf '%s\n' "$app_signing_info" | /usr/bin/rg -q 'flags=.*runtime'; then
+if ! rg -qF "TeamIdentifier=$TEAM_ID" <<< "$app_signing_info" \
+  || ! rg -q 'flags=.*runtime' <<< "$app_signing_info"; then
   echo "The contained app does not satisfy the team or Hardened Runtime contract." >&2
   exit 1
 fi

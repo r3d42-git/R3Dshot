@@ -32,7 +32,7 @@ require_command() {
   }
 }
 
-for command in xcodebuild xcrun security codesign ditto hdiutil osascript shasum; do
+for command in xcodebuild xcrun security codesign ditto hdiutil osascript shasum rg; do
   require_command "$command"
 done
 
@@ -47,11 +47,12 @@ if [[ "$source_version" != "$VERSION" ]]; then
   echo "Configuration/Info.plist declares $source_version, not requested version $VERSION." >&2
   exit 1
 fi
-if ! /usr/bin/rg -qF "MARKETING_VERSION = $VERSION;" "$ROOT_DIR/R3Dshot.xcodeproj/project.pbxproj"; then
+if ! rg -qF "MARKETING_VERSION = $VERSION;" "$ROOT_DIR/R3Dshot.xcodeproj/project.pbxproj"; then
   echo "The Xcode MARKETING_VERSION does not match $VERSION." >&2
   exit 1
 fi
-if ! /usr/bin/security find-identity -v -p codesigning | /usr/bin/rg -qF "$SIGNING_IDENTITY"; then
+available_identities="$(/usr/bin/security find-identity -v -p codesigning)"
+if ! rg -qF "$SIGNING_IDENTITY" <<< "$available_identities"; then
   echo "Developer ID identity is unavailable: $SIGNING_IDENTITY" >&2
   exit 1
 fi
@@ -98,9 +99,9 @@ fi
 
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 codesign -dvv --verbose=4 "$APP_BUNDLE" 2>&1 | tee "$RELEASE_DIR/$APP_NAME.codesign.txt"
-if ! /usr/bin/rg -qF "Authority=$SIGNING_IDENTITY" "$RELEASE_DIR/$APP_NAME.codesign.txt" \
-  || ! /usr/bin/rg -qF "TeamIdentifier=$TEAM_ID" "$RELEASE_DIR/$APP_NAME.codesign.txt" \
-  || ! /usr/bin/rg -q 'flags=.*runtime' "$RELEASE_DIR/$APP_NAME.codesign.txt"; then
+if ! rg -qF "Authority=$SIGNING_IDENTITY" "$RELEASE_DIR/$APP_NAME.codesign.txt" \
+  || ! rg -qF "TeamIdentifier=$TEAM_ID" "$RELEASE_DIR/$APP_NAME.codesign.txt" \
+  || ! rg -q 'flags=.*runtime' "$RELEASE_DIR/$APP_NAME.codesign.txt"; then
   echo "The archived app does not meet the Developer ID, team, or Hardened Runtime contract." >&2
   exit 1
 fi
