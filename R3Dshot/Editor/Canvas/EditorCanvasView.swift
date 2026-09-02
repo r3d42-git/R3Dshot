@@ -159,7 +159,7 @@ struct EditorCanvasView: View {
 
                 guard let interaction else { return }
                 switch interaction.mode {
-                case .createRectangle, .createEllipse, .createRedaction, .createCrop, .createText, .createSpeechBubble, .createStepNumber, .createPixelate, .createFocus:
+                case .createRectangle, .createEllipse, .createRedaction, .createCrop, .createText, .createSpeechBubble, .createPixelate, .createFocus:
                     draftBounds = CanvasRect(
                         CGRect(
                             x: interaction.startPoint.x,
@@ -195,6 +195,9 @@ struct EditorCanvasView: View {
                        hypot(constrainedPoint.x - last.x, constrainedPoint.y - last.y) >= 0.75 {
                         draftMarkerPoints.append(constrainedPoint)
                     }
+
+                case .createStepNumber:
+                    break
 
                 case .move:
                     guard let elementID = interaction.elementID,
@@ -242,7 +245,7 @@ struct EditorCanvasView: View {
                 case .createSpeechBubble:
                     if let draftBounds, draftBounds.width >= 24, draftBounds.height >= 24 { store.insertSpeechBubble(in: draftBounds) }
                 case .createStepNumber:
-                    if let draftBounds, draftBounds.width >= 24, draftBounds.height >= 24 { store.insertStepNumber(in: draftBounds) }
+                    store.insertStepNumber(at: interaction.startPoint)
                 case .createPixelate: if let draftBounds { store.insertPixelate(in: draftBounds) }
                 case .createFocus: if let draftBounds { store.insertFocus(in: draftBounds) }
                 case .move:
@@ -524,6 +527,7 @@ private struct SelectionHandles: View {
                         store: store,
                         elementID: element.id,
                         corner: corner,
+                        preservesAspectRatio: element.isStepNumber,
                         transform: transform
                     )
                     .position(corner.position(in: rect))
@@ -585,6 +589,7 @@ private struct ResizeHandle: View {
     let store: EditorStore
     let elementID: UUID
     let corner: ResizeCorner
+    let preservesAspectRatio: Bool
     let transform: CanvasTransform
 
     @State private var originalBounds: CanvasRect?
@@ -606,7 +611,11 @@ private struct ResizeHandle: View {
                         guard let originalBounds else { return }
                         let point = transform.canvasPoint(from: value.location)
                         store.previewBounds(
-                            corner.resized(originalBounds, to: point),
+                            corner.resized(
+                                originalBounds,
+                                to: point,
+                                preservingAspectRatio: preservesAspectRatio
+                            ),
                             for: elementID
                         )
                     }
@@ -642,9 +651,31 @@ private enum ResizeCorner: CaseIterable, Identifiable {
         }
     }
 
-    func resized(_ original: CanvasRect, to point: CGPoint) -> CanvasRect {
+    func resized(
+        _ original: CanvasRect,
+        to point: CGPoint,
+        preservingAspectRatio: Bool = false
+    ) -> CanvasRect {
         let minSize: CGFloat = 4
         let rect = original.cgRect
+
+        if preservingAspectRatio {
+            switch self {
+            case .topLeft:
+                let side = max(minSize, rect.maxX - point.x, rect.maxY - point.y)
+                return CanvasRect(x: rect.maxX - side, y: rect.maxY - side, width: side, height: side)
+            case .topRight:
+                let side = max(minSize, point.x - rect.minX, rect.maxY - point.y)
+                return CanvasRect(x: rect.minX, y: rect.maxY - side, width: side, height: side)
+            case .bottomLeft:
+                let side = max(minSize, rect.maxX - point.x, point.y - rect.minY)
+                return CanvasRect(x: rect.maxX - side, y: rect.minY, width: side, height: side)
+            case .bottomRight:
+                let side = max(minSize, point.x - rect.minX, point.y - rect.minY)
+                return CanvasRect(x: rect.minX, y: rect.minY, width: side, height: side)
+            }
+        }
+
         switch self {
         case .topLeft:
             return CanvasRect(
@@ -675,5 +706,14 @@ private enum ResizeCorner: CaseIterable, Identifiable {
                 height: max(minSize, point.y - rect.minY)
             )
         }
+    }
+}
+
+private extension AnnotationElement {
+    var isStepNumber: Bool {
+        if case .stepNumber = payload {
+            return true
+        }
+        return false
     }
 }

@@ -62,7 +62,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .marker: "Marker – einen Bereich freihändig transparent hervorheben"
         case .text: "Text – einen editierbaren Textbereich aufziehen"
         case .speechBubble: "Sprechblase – einen beschrifteten Hinweis aufziehen"
-        case .stepNumber: "Schritt – eine nummerierte Markierung aufziehen"
+        case .stepNumber: "Schritt – eine nummerierte Markierung per Klick platzieren"
         case .pixelate: "Pixelieren – einen Bereich nicht-destruktiv verpixeln"
         case .focus: "Fokus – markierten Bereich scharf hervorheben"
         }
@@ -78,6 +78,8 @@ struct EditorSession {
 @MainActor
 @Observable
 final class EditorStore {
+    private static let initialStepNumberSize: CGFloat = 44
+
     let session: EditorSession
     private(set) var document: ScreenshotDocument
     var selectedElementID: UUID?
@@ -170,6 +172,14 @@ final class EditorStore {
     var selectedFocusStyle: FocusStyle? {
         guard case let .focus(style)? = selectedElement?.payload else { return nil }
         return style
+    }
+
+    var stepNumberCount: Int {
+        document.elements.reduce(into: 0) { count, element in
+            if case .stepNumber = element.payload {
+                count += 1
+            }
+        }
     }
 
     var hasUnsavedChanges: Bool {
@@ -339,17 +349,27 @@ final class EditorStore {
         }
     }
 
-    func insertStepNumber(in bounds: CanvasRect) {
-        let clamped = bounds.clamped(to: document.original.pixelSize, minimumSize: 24)
-        guard clamped.width >= 24, clamped.height >= 24 else { return }
-        let existingNumbers = document.elements.compactMap { element -> Int? in
-            guard case let .stepNumber(style) = element.payload else { return nil }
-            return style.number
-        }
-        let nextNumber = (existingNumbers.max() ?? 0) + 1
+    func insertStepNumber(at point: CGPoint) {
+        let canvasSize = document.original.pixelSize.cgSize
+        let size = min(Self.initialStepNumberSize, min(canvasSize.width, canvasSize.height))
+        guard size >= 24 else { return }
+        let bounds = CanvasRect(
+            x: point.x - size / 2,
+            y: point.y - size / 2,
+            width: size,
+            height: size
+        )
+        .clamped(to: document.original.pixelSize, minimumSize: 24)
+
         perform(actionName: "Schritt hinzufügen") {
-            let element = AnnotationElement(zIndex: nextZIndex, transform: ElementTransform(boundsInCanvasPixels: clamped), payload: .stepNumber(StepNumberStyle(number: nextNumber)))
-            document.elements.append(element); selectedElementID = element.id; activeTool = .select
+            let element = AnnotationElement(
+                zIndex: nextZIndex,
+                transform: ElementTransform(boundsInCanvasPixels: bounds),
+                payload: .stepNumber(StepNumberStyle(number: stepNumberCount + 1))
+            )
+            document.elements.append(element)
+            selectedElementID = element.id
+            activeTool = .select
         }
     }
 
@@ -388,7 +408,7 @@ final class EditorStore {
         guard let index = index(of: elementID) else { return }
         document.elements[index].transform.boundsInCanvasPixels = bounds.clamped(
             to: document.original.pixelSize,
-            minimumSize: 4
+            minimumSize: minimumBoundsSize(for: document.elements[index])
         )
     }
 
@@ -439,20 +459,35 @@ final class EditorStore {
 
     func deleteSelection() {
         guard let selectedElementID, let index = index(of: selectedElementID) else { return }
+        let deletedElementIsStepNumber: Bool
+        if case .stepNumber = document.elements[index].payload {
+            deletedElementIsStepNumber = true
+        } else {
+            deletedElementIsStepNumber = false
+        }
+
         perform(actionName: "Element löschen") {
             document.elements.remove(at: index)
             self.selectedElementID = nil
             normalizeZIndexes()
+            if deletedElementIsStepNumber {
+                normalizeStepNumbers()
+            }
         }
     }
 
     func duplicateSelection() {
         guard let selectedElement else { return }
         perform(actionName: "Element duplizieren") {
+            var payload = selectedElement.payload
+            if case var .stepNumber(style) = payload {
+                style.number = stepNumberCount + 1
+                payload = .stepNumber(style)
+            }
             var duplicate = AnnotationElement(
                 zIndex: nextZIndex,
                 transform: selectedElement.transform,
-                payload: selectedElement.payload
+                payload: payload
             )
             let shifted = duplicate.transform.boundsInCanvasPixels.cgRect.offsetBy(dx: 16, dy: 16)
             duplicate.transform.boundsInCanvasPixels = CanvasRect(shifted)
@@ -558,8 +593,21 @@ final class EditorStore {
     }
 
     func setSelectedStepNumberStyle(_ style: StepNumberStyle, actionName: String) {
-        guard let selectedElementID, let index = index(of: selectedElementID), case .stepNumber = document.elements[index].payload else { return }
-        perform(actionName: actionName) { document.elements[index].payload = .stepNumber(style) }
+        guard let selectedElementID,
+              let index = index(of: selectedElementID),
+              case let .stepNumber(currentStyle) = document.elements[index].payload
+        else { return }
+
+        let requestedPosition = min(max(1, style.number), stepNumberCount)
+        perform(actionName: actionName) {
+            var updated = style
+            updated.number = requestedPosition
+            document.elements[index].payload = .stepNumber(updated)
+
+            if requestedPosition != currentStyle.number {
+                placeStepNumber(selectedElementID, at: requestedPosition)
+            }
+        }
     }
 
     func setSelectedPixelateStyle(_ style: PixelateStyle, actionName: String) {
@@ -598,10 +646,15 @@ final class EditorStore {
         else { return }
 
         perform(actionName: "Element einsetzen") {
+            var payload = element.payload
+            if case var .stepNumber(style) = payload {
+                style.number = stepNumberCount + 1
+                payload = .stepNumber(style)
+            }
             var pasted = AnnotationElement(
                 zIndex: nextZIndex,
                 transform: element.transform,
-                payload: element.payload
+                payload: payload
             )
             pasted.transform.boundsInCanvasPixels = CanvasRect(
                 pasted.transform.boundsInCanvasPixels.cgRect.offsetBy(dx: 16, dy: 16)
@@ -614,6 +667,17 @@ final class EditorStore {
 
     private var nextZIndex: Int {
         (document.elements.map(\.zIndex).max() ?? -1) + 1
+    }
+
+    private func minimumBoundsSize(for element: AnnotationElement) -> CGFloat {
+        switch element.payload {
+        case .text, .pixelate, .focus:
+            12
+        case .speechBubble, .stepNumber:
+            24
+        case .rectangle, .ellipse, .arrow, .redaction, .marker:
+            4
+        }
     }
 
     private func hitTest(
@@ -692,6 +756,48 @@ final class EditorStore {
                 document.elements[index].zIndex = zIndex
             }
         }
+    }
+
+    private func placeStepNumber(_ id: UUID, at position: Int) {
+        var orderedIDs = stepNumberIndices()
+            .map { document.elements[$0].id }
+        orderedIDs.removeAll { $0 == id }
+        orderedIDs.insert(id, at: min(max(0, position - 1), orderedIDs.count))
+
+        for (number, stepID) in orderedIDs.enumerated() {
+            guard let index = index(of: stepID),
+                  case var .stepNumber(style) = document.elements[index].payload
+            else { continue }
+            style.number = number + 1
+            document.elements[index].payload = .stepNumber(style)
+        }
+    }
+
+    private func normalizeStepNumbers() {
+        for (number, index) in stepNumberIndices().enumerated() {
+            guard case var .stepNumber(style) = document.elements[index].payload else { continue }
+            style.number = number + 1
+            document.elements[index].payload = .stepNumber(style)
+        }
+    }
+
+    private func stepNumberIndices() -> [Int] {
+        document.elements.indices
+            .filter {
+                if case .stepNumber = document.elements[$0].payload {
+                    return true
+                }
+                return false
+            }
+            .sorted { lhs, rhs in
+                guard case let .stepNumber(lhsStyle) = document.elements[lhs].payload,
+                      case let .stepNumber(rhsStyle) = document.elements[rhs].payload
+                else { return lhs < rhs }
+                if lhsStyle.number != rhsStyle.number {
+                    return lhsStyle.number < rhsStyle.number
+                }
+                return lhs < rhs
+            }
     }
 
     private func perform(actionName: String, mutation: () -> Void) {

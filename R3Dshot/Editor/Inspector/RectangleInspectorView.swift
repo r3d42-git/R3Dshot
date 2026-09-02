@@ -467,13 +467,35 @@ struct RectangleInspectorView: View {
                 Form {
                     Section("Schritt") {
                         Stepper("Nummer: \(style.number)", value: Binding(get: { style.number }, set: { number in
-                            var updated = style; updated.number = max(1, number)
+                            var updated = style
+                            updated.number = number
                             store.setSelectedStepNumberStyle(updated, actionName: "Schrittnummer ändern")
-                        }), in: 1...999)
+                        }), in: 1...max(1, store.stepNumberCount))
+                        Text("Die Nummer bestimmt die Reihenfolge; die übrigen Schritte werden automatisch nachgezogen.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         ColorPicker("Füllung", selection: colorBinding(get: { style.fillColor }, set: { color in
-                            var updated = style; updated.fillColor = color
+                            var updated = style
+                            updated.fillColor = color
                             store.setSelectedStepNumberStyle(updated, actionName: "Schrittfarbe ändern")
                         }))
+                        ColorPicker("Zahl", selection: colorBinding(get: { style.textColor }, set: { color in
+                            var updated = style
+                            updated.textColor = color
+                            store.setSelectedStepNumberStyle(updated, actionName: "Zahlenfarbe ändern")
+                        }))
+                        LabeledContent("Schriftgröße") {
+                            HStack {
+                                Slider(value: valueBinding(get: { style.fontSize }, set: { value in
+                                    var updated = style
+                                    updated.fontSize = value
+                                    store.setSelectedStepNumberStyle(updated, actionName: "Schriftgröße ändern")
+                                }), in: 12...96)
+                                Text("\(Int(style.fontSize)) px")
+                                    .monospacedDigit()
+                                    .frame(width: 48, alignment: .trailing)
+                            }
+                        }
                     }
                     Section("Anordnung") { arrangementControls }
                 }.formStyle(.grouped)
