@@ -432,6 +432,51 @@ struct RectangleInspectorView: View {
                     }
                 }
                 .formStyle(.grouped)
+            } else if let style = store.selectedSpeechBubbleStyle {
+                Form {
+                    Section("Sprechblase") {
+                        TextEditor(text: Binding(get: { style.textStyle.text }, set: { text in
+                            var updated = style; updated.textStyle.text = text
+                            store.setSelectedSpeechBubbleStyle(updated, actionName: "Sprechblasentext ändern")
+                        }))
+                        .frame(minHeight: 90)
+                        ColorPicker("Rahmen", selection: colorBinding(get: { style.strokeColor }, set: { color in
+                            var updated = style; updated.strokeColor = color
+                            store.setSelectedSpeechBubbleStyle(updated, actionName: "Rahmenfarbe ändern")
+                        }))
+                        ColorPicker("Füllung", selection: colorBinding(get: { style.fillColor }, set: { color in
+                            var updated = style; updated.fillColor = color
+                            store.setSelectedSpeechBubbleStyle(updated, actionName: "Füllfarbe ändern")
+                        }))
+                        LabeledContent("Zeiger horizontal") {
+                            Slider(value: Binding(get: { style.tailPoint.x }, set: { x in
+                                var updated = style; updated.tailPoint.x = x
+                                store.setSelectedSpeechBubbleStyle(updated, actionName: "Sprechblasenzeiger verschieben")
+                            }), in: 0...1)
+                        }
+                        LabeledContent("Zeigerlänge") {
+                            Slider(value: Binding(get: { style.tailPoint.y }, set: { y in
+                                var updated = style; updated.tailPoint.y = y
+                                store.setSelectedSpeechBubbleStyle(updated, actionName: "Sprechblasenzeiger verschieben")
+                            }), in: 1...1.6)
+                        }
+                    }
+                    Section("Anordnung") { arrangementControls }
+                }.formStyle(.grouped)
+            } else if let style = store.selectedStepNumberStyle {
+                Form {
+                    Section("Schritt") {
+                        Stepper("Nummer: \(style.number)", value: Binding(get: { style.number }, set: { number in
+                            var updated = style; updated.number = max(1, number)
+                            store.setSelectedStepNumberStyle(updated, actionName: "Schrittnummer ändern")
+                        }), in: 1...999)
+                        ColorPicker("Füllung", selection: colorBinding(get: { style.fillColor }, set: { color in
+                            var updated = style; updated.fillColor = color
+                            store.setSelectedStepNumberStyle(updated, actionName: "Schrittfarbe ändern")
+                        }))
+                    }
+                    Section("Anordnung") { arrangementControls }
+                }.formStyle(.grouped)
             } else {
                 ContentUnavailableView(
                     "Keine Auswahl",
@@ -491,6 +536,13 @@ struct RectangleInspectorView: View {
         var updated = current
         mutation(&updated)
         store.setSelectedTextStyle(updated, actionName: actionName)
+    }
+
+    private var arrangementControls: some View {
+        VStack(alignment: .leading) {
+            HStack { Button("Nach vorn") { store.bringSelectionForward() }; Button("Nach hinten") { store.sendSelectionBackward() } }
+            HStack { Button("Duplizieren") { store.duplicateSelection() }; Button("Löschen", role: .destructive) { store.deleteSelection() } }
+        }
     }
 
     private func valueBinding(

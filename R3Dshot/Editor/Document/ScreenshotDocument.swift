@@ -125,6 +125,22 @@ struct TextStyle: Codable, Equatable, Sendable {
     var opacity: CGFloat = 1
 }
 
+struct SpeechBubbleStyle: Codable, Equatable, Sendable {
+    var textStyle = TextStyle(text: "Sprechblase", color: .black, fontSize: 24)
+    var fillColor = RGBAColor(red: 1, green: 1, blue: 1, alpha: 0.96)
+    var strokeColor = RGBAColor.accentRed
+    var lineWidth: CGFloat = 2
+    var cornerRadius: CGFloat = 14
+    var tailPoint = NormalizedPoint(x: 0.25, y: 1.15)
+}
+
+struct StepNumberStyle: Codable, Equatable, Sendable {
+    var number: Int = 1
+    var fillColor = RGBAColor.accentRed
+    var textColor = RGBAColor(red: 1, green: 1, blue: 1, alpha: 1)
+    var fontSize: CGFloat = 24
+}
+
 enum AnnotationPayload: Codable, Equatable, Sendable {
     case rectangle(ShapeStyle)
     case ellipse(ShapeStyle)
@@ -132,6 +148,8 @@ enum AnnotationPayload: Codable, Equatable, Sendable {
     case redaction(RedactionStyle)
     case marker(MarkerStyle)
     case text(TextStyle)
+    case speechBubble(SpeechBubbleStyle)
+    case stepNumber(StepNumberStyle)
 }
 
 struct AnnotationElement: Identifiable, Codable, Equatable, Sendable {

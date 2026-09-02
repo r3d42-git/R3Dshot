@@ -194,6 +194,12 @@ enum ScreenshotRenderer {
             context.strokePath()
         case let .text(style):
             drawText(style, in: drawingBounds, context: context)
+        case let .speechBubble(style):
+            drawSpeechBubble(style, in: drawingBounds, context: context, coordinateOrigin: coordinateOrigin)
+        case let .stepNumber(style):
+            context.setFillColor(style.fillColor.cgColor)
+            context.fillEllipse(in: drawingBounds)
+            drawText(TextStyle(text: "\(style.number)", color: style.textColor, fontSize: style.fontSize, alignment: .center), in: drawingBounds.insetBy(dx: 3, dy: 3), context: context)
         }
     }
 
@@ -235,6 +241,19 @@ enum ScreenshotRenderer {
             nil
         )
         CTFrameDraw(frame, context)
+    }
+
+    private static func drawSpeechBubble(_ style: SpeechBubbleStyle, in bounds: CGRect, context: CGContext, coordinateOrigin: CoordinateOrigin) {
+        let path = CGPath(roundedRect: bounds, cornerWidth: style.cornerRadius, cornerHeight: style.cornerRadius, transform: nil)
+        context.addPath(path); context.setFillColor(style.fillColor.cgColor); context.fillPath()
+        context.addPath(path); context.setStrokeColor(style.strokeColor.cgColor); context.setLineWidth(style.lineWidth); context.strokePath()
+        let tip = drawingPoint(style.tailPoint, in: bounds, coordinateOrigin: coordinateOrigin)
+        let baseY = bounds.minY
+        let baseX = min(max(tip.x, bounds.minX + 14), bounds.maxX - 14)
+        context.setFillColor(style.fillColor.cgColor)
+        context.beginPath(); context.move(to: CGPoint(x: baseX - 10, y: baseY)); context.addLine(to: CGPoint(x: baseX + 10, y: baseY)); context.addLine(to: tip); context.closePath(); context.fillPath()
+        context.setStrokeColor(style.strokeColor.cgColor); context.setLineWidth(style.lineWidth); context.beginPath(); context.move(to: CGPoint(x: baseX - 10, y: baseY)); context.addLine(to: tip); context.addLine(to: CGPoint(x: baseX + 10, y: baseY)); context.strokePath()
+        drawText(style.textStyle, in: bounds.insetBy(dx: 12, dy: 10), context: context)
     }
 
     private static func paragraphStyle(for alignment: AnnotationTextAlignment) -> CTParagraphStyle {
@@ -287,6 +306,8 @@ enum ScreenshotRenderer {
         case .redaction: 1
         case let .marker(style): style.opacity
         case let .text(style): style.opacity
+        case .speechBubble: 1
+        case .stepNumber: 1
         }
     }
 }

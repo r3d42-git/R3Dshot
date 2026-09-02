@@ -4,7 +4,7 @@ Stand: 2. September 2026
 
 ## Als Nächstes
 
-Phase 3 ist abgeschlossen. Als Nächstes folgt Phase 4: Sprechblasen und Schrittmarker.
+Phase 4 ist abgeschlossen. Als Nächstes folgt Phase 5: Pixelierung.
 
 ### Erledigt: App-Lifecycle und sicheres Beenden
 
@@ -24,8 +24,12 @@ Erledigt: Text ist ein codierbares Element mit Inhalt, Systemschrift, Größe, F
 
 ### Phase 4: Callouts
 
-- Sprechblasen ergänzen Text mit einem Rahmen und verschiebbarem Zeiger.
-- Schrittmarker sind nummerierte, verschiebbare Kreismarken mit korrigierbarer Zahl.
+Erledigt: Sprechblasen ergänzen Text mit Rahmen und über den Inspector beweglichem Zeiger. Schrittmarker sind nummerierte, verschiebbare Kreismarken mit korrigierbarer Zahl.
+
+### Phase 5: Pixelierung und Fokus
+
+- Pixelierung wirkt nur innerhalb ihres Rechtecks; die Blockgröße ist einstellbar.
+- Fokus lässt den markierten Bereich scharf und weichzeichnet die bestehende Komposition außerhalb davon.
 
 ## Bestätigter Stand
 

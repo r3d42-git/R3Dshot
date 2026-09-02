@@ -10,6 +10,8 @@ enum EditorTool: String, CaseIterable, Identifiable {
     case redaction
     case marker
     case text
+    case speechBubble
+    case stepNumber
 
     var id: String { rawValue }
 
@@ -23,6 +25,8 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .redaction: "Schwärzen"
         case .marker: "Marker"
         case .text: "Text"
+        case .speechBubble: "Sprechblase"
+        case .stepNumber: "Schritt"
         }
     }
 
@@ -36,6 +40,8 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .redaction: "rectangle.fill"
         case .marker: "highlighter"
         case .text: "text.cursor"
+        case .speechBubble: "text.bubble"
+        case .stepNumber: "1.circle"
         }
     }
 
@@ -49,6 +55,8 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .redaction: "Schwärzen – einen Bereich vollständig und dauerhaft sichtbar abdecken"
         case .marker: "Marker – einen Bereich freihändig transparent hervorheben"
         case .text: "Text – einen editierbaren Textbereich aufziehen"
+        case .speechBubble: "Sprechblase – einen beschrifteten Hinweis aufziehen"
+        case .stepNumber: "Schritt – eine nummerierte Markierung aufziehen"
         }
     }
 }
@@ -91,7 +99,7 @@ final class EditorStore {
     var selectedShapeStyle: ShapeStyle? {
         switch selectedElement?.payload {
         case let .rectangle(style), let .ellipse(style): style
-        case .arrow, .redaction, .marker, .text, nil: nil
+        case .arrow, .redaction, .marker, .text, .speechBubble, .stepNumber, nil: nil
         }
     }
 
@@ -103,6 +111,8 @@ final class EditorStore {
         case .redaction: "Schwärzung"
         case .marker: "Marker"
         case .text: "Text"
+        case .speechBubble: "Sprechblase"
+        case .stepNumber: "Schritt"
         case nil: nil
         }
     }
@@ -129,6 +139,16 @@ final class EditorStore {
 
     var selectedTextStyle: TextStyle? {
         guard case let .text(style)? = selectedElement?.payload else { return nil }
+        return style
+    }
+
+    var selectedSpeechBubbleStyle: SpeechBubbleStyle? {
+        guard case let .speechBubble(style)? = selectedElement?.payload else { return nil }
+        return style
+    }
+
+    var selectedStepNumberStyle: StepNumberStyle? {
+        guard case let .stepNumber(style)? = selectedElement?.payload else { return nil }
         return style
     }
 
@@ -290,6 +310,29 @@ final class EditorStore {
         }
     }
 
+    func insertSpeechBubble(in bounds: CanvasRect) {
+        let clamped = bounds.clamped(to: document.original.pixelSize, minimumSize: 24)
+        guard clamped.width >= 24, clamped.height >= 24 else { return }
+        perform(actionName: "Sprechblase hinzufügen") {
+            let element = AnnotationElement(zIndex: nextZIndex, transform: ElementTransform(boundsInCanvasPixels: clamped), payload: .speechBubble(SpeechBubbleStyle()))
+            document.elements.append(element); selectedElementID = element.id; activeTool = .select
+        }
+    }
+
+    func insertStepNumber(in bounds: CanvasRect) {
+        let clamped = bounds.clamped(to: document.original.pixelSize, minimumSize: 24)
+        guard clamped.width >= 24, clamped.height >= 24 else { return }
+        let existingNumbers = document.elements.compactMap { element -> Int? in
+            guard case let .stepNumber(style) = element.payload else { return nil }
+            return style.number
+        }
+        let nextNumber = (existingNumbers.max() ?? 0) + 1
+        perform(actionName: "Schritt hinzufügen") {
+            let element = AnnotationElement(zIndex: nextZIndex, transform: ElementTransform(boundsInCanvasPixels: clamped), payload: .stepNumber(StepNumberStyle(number: nextNumber)))
+            document.elements.append(element); selectedElementID = element.id; activeTool = .select
+        }
+    }
+
     func selectElement(at point: CGPoint, tolerance: CGFloat = 5) {
         selectedElementID = document.elements
             .sorted { $0.zIndex > $1.zIndex }
@@ -422,6 +465,8 @@ final class EditorStore {
                 break
             case .text:
                 break
+            case .speechBubble, .stepNumber:
+                break
             }
         }
     }
@@ -460,6 +505,16 @@ final class EditorStore {
         perform(actionName: actionName) {
             document.elements[index].payload = .text(style)
         }
+    }
+
+    func setSelectedSpeechBubbleStyle(_ style: SpeechBubbleStyle, actionName: String) {
+        guard let selectedElementID, let index = index(of: selectedElementID), case .speechBubble = document.elements[index].payload else { return }
+        perform(actionName: actionName) { document.elements[index].payload = .speechBubble(style) }
+    }
+
+    func setSelectedStepNumberStyle(_ style: StepNumberStyle, actionName: String) {
+        guard let selectedElementID, let index = index(of: selectedElementID), case .stepNumber = document.elements[index].payload else { return }
+        perform(actionName: actionName) { document.elements[index].payload = .stepNumber(style) }
     }
 
     func copySelection() {
@@ -502,7 +557,7 @@ final class EditorStore {
         tolerance: CGFloat
     ) -> Bool {
         switch element.payload {
-        case .rectangle, .ellipse, .redaction, .text:
+        case .rectangle, .ellipse, .redaction, .text, .speechBubble, .stepNumber:
             return element.transform.boundsInCanvasPixels.cgRect
                 .insetBy(dx: -tolerance, dy: -tolerance)
                 .contains(point)
