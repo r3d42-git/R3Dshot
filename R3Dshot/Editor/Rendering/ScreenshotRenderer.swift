@@ -199,13 +199,93 @@ enum ScreenshotRenderer {
             drawSpeechBubble(style, in: drawingBounds, context: context, coordinateOrigin: coordinateOrigin)
         case let .stepNumber(style):
             context.setFillColor(style.fillColor.cgColor)
-            context.fillEllipse(in: drawingBounds)
-            drawText(TextStyle(text: "\(style.number)", color: style.textColor, fontSize: style.fontSize, alignment: .center), in: drawingBounds.insetBy(dx: 3, dy: 3), context: context)
+            drawStepNumberShape(style.shape, in: drawingBounds, context: context)
+            drawStepNumberLabel(style, in: drawingBounds, context: context)
         case let .pixelate(style):
             applyPixelation(blockSize: style.blockSize, in: drawingBounds, context: context)
         case let .focus(style):
             applyFocus(radius: style.blurRadius, keeping: drawingBounds, context: context)
         }
+    }
+
+    private static func drawStepNumberShape(
+        _ shape: StepNumberShape,
+        in bounds: CGRect,
+        context: CGContext
+    ) {
+        switch shape {
+        case .circle:
+            context.fillEllipse(in: bounds)
+        case .square:
+            context.fill(bounds)
+        case .roundedSquare:
+            let radius = min(bounds.width, bounds.height) * 0.22
+            context.addPath(
+                CGPath(
+                    roundedRect: bounds,
+                    cornerWidth: radius,
+                    cornerHeight: radius,
+                    transform: nil
+                )
+            )
+            context.fillPath()
+        }
+    }
+
+    /// Draws a step number from its actual glyph bounds rather than from a
+    /// paragraph frame. This keeps narrow digits such as “1” optically centred
+    /// and makes the label grow and shrink with its square marker.
+    private static func drawStepNumberLabel(
+        _ style: StepNumberStyle,
+        in bounds: CGRect,
+        context: CGContext
+    ) {
+        let markerSide = min(bounds.width, bounds.height)
+        guard markerSide > 0 else { return }
+
+        let inset = max(2, markerSide * (3 / 44))
+        let labelBounds = bounds.insetBy(dx: inset, dy: inset)
+        let preferredFontSize = max(1, markerSide * (24 / 44))
+        let text = "\(style.number)"
+        let preferredLine = stepNumberLine(
+            text,
+            fontSize: preferredFontSize,
+            color: style.textColor
+        )
+        let preferredWidth = CGFloat(
+            CTLineGetTypographicBounds(preferredLine, nil, nil, nil)
+        )
+        let fontSize = preferredFontSize * min(
+            1,
+            labelBounds.width / max(1, preferredWidth)
+        )
+        let line = stepNumberLine(text, fontSize: fontSize, color: style.textColor)
+        let glyphBounds = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
+
+        guard !glyphBounds.isNull else { return }
+        context.textPosition = CGPoint(
+            x: labelBounds.midX - glyphBounds.midX,
+            y: labelBounds.midY - glyphBounds.midY
+        )
+        CTLineDraw(line, context)
+    }
+
+    private static func stepNumberLine(
+        _ text: String,
+        fontSize: CGFloat,
+        color: RGBAColor
+    ) -> CTLine {
+        let attributes: [NSAttributedString.Key: Any] = [
+            kCTFontAttributeName as NSAttributedString.Key: CTFontCreateWithName(
+                "SF Pro" as CFString,
+                fontSize,
+                nil
+            ),
+            kCTForegroundColorAttributeName as NSAttributedString.Key: color.cgColor
+        ]
+        return CTLineCreateWithAttributedString(
+            NSAttributedString(string: text, attributes: attributes)
+        )
     }
 
     private static func addArrowhead(

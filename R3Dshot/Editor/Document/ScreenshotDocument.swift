@@ -134,11 +134,56 @@ struct SpeechBubbleStyle: Codable, Equatable, Sendable {
     var tailPoint = NormalizedPoint(x: 0.25, y: 1.15)
 }
 
+/// The visual container for a numbered step marker.
+///
+/// Unknown values decode as a circle so a document created by a newer version
+/// remains usable instead of failing to open in an older version of R3Dshot.
+enum StepNumberShape: String, CaseIterable, Codable, Equatable, Hashable, Sendable {
+    case circle
+    case square
+    case roundedSquare
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: value) ?? .circle
+    }
+}
+
 struct StepNumberStyle: Codable, Equatable, Sendable {
     var number: Int = 1
     var fillColor = RGBAColor.accentRed
     var textColor = RGBAColor(red: 1, green: 1, blue: 1, alpha: 1)
-    var fontSize: CGFloat = 24
+    var shape: StepNumberShape = .circle
+}
+
+extension StepNumberStyle {
+    private enum CodingKeys: String, CodingKey {
+        case number
+        case fillColor
+        case textColor
+        case shape
+    }
+
+    /// `shape` was introduced after the initial document format. Decode the
+    /// missing property from older documents as the original circular marker.
+    /// Older documents may contain a `fontSize` key; keyed decoding safely
+    /// ignores it because step label size is now derived from marker bounds.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        number = try container.decodeIfPresent(Int.self, forKey: .number) ?? 1
+        fillColor = try container.decodeIfPresent(RGBAColor.self, forKey: .fillColor) ?? .accentRed
+        textColor = try container.decodeIfPresent(RGBAColor.self, forKey: .textColor)
+            ?? RGBAColor(red: 1, green: 1, blue: 1, alpha: 1)
+        shape = try container.decodeIfPresent(StepNumberShape.self, forKey: .shape) ?? .circle
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(number, forKey: .number)
+        try container.encode(fillColor, forKey: .fillColor)
+        try container.encode(textColor, forKey: .textColor)
+        try container.encode(shape, forKey: .shape)
+    }
 }
 
 struct PixelateStyle: Codable, Equatable, Sendable {
@@ -203,6 +248,60 @@ struct CropState: Codable, Equatable, Sendable {
                 height: size.cgSize.height
             )
         )
+    }
+}
+
+enum CropAspectRatio: String, CaseIterable, Identifiable {
+    case free
+    case square
+    case widescreen
+    case standard
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .free: "Frei"
+        case .square: "1:1"
+        case .widescreen: "16:9"
+        case .standard: "4:3"
+        }
+    }
+
+    var ratio: CGFloat? {
+        switch self {
+        case .free: nil
+        case .square: 1
+        case .widescreen: 16 / 9
+        case .standard: 4 / 3
+        }
+    }
+
+    /// Fits the requested ratio inside the current crop while retaining its
+    /// centre. This never grows the crop beyond its former content.
+    func constrainedBounds(_ bounds: CanvasRect, in canvasSize: PixelSize) -> CanvasRect {
+        guard let ratio else {
+            return bounds.clamped(to: canvasSize, minimumSize: 4)
+        }
+
+        let rect = bounds.cgRect.standardized
+        guard rect.width > 0, rect.height > 0 else {
+            return bounds.clamped(to: canvasSize, minimumSize: 4)
+        }
+
+        let size: CGSize
+        if rect.width / rect.height > ratio {
+            size = CGSize(width: rect.height * ratio, height: rect.height)
+        } else {
+            size = CGSize(width: rect.width, height: rect.width / ratio)
+        }
+        return CanvasRect(
+            x: rect.midX - size.width / 2,
+            y: rect.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
+        .clamped(to: canvasSize, minimumSize: 4)
     }
 }
 

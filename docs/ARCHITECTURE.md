@@ -1,6 +1,6 @@
 # R3Dshot – Architektur
 
-**Status:** Phase 2 umgesetzt; Phase 3 mit dem ersten vollständigen Editor-Schnitt begonnen.
+**Status:** Phase 7 umgesetzt. Dieses Dokument hält die tragenden Architekturentscheidungen und die Grenzen des inzwischen vollständigen Editorpfads fest.
 
 R3Dshot wird eine ausschließlich native, lokale macOS-Menüleisten-App für Apple Silicon und macOS 15.2 oder neuer. Sie verwendet keine externen Laufzeit-Abhängigkeiten. Die erste Fassung ist für direkte, signierte GitHub-Distribution vorgesehen und nicht für den Mac App Store sandboxed. Dadurch ist das Speichern in ~/Pictures/R3Dshot ohne unnötige Bookmark-Infrastruktur möglich. Ein späterer App-Store-Ableger wäre eine getrennte Erweiterung mit Security-Scoped Bookmarks.
 

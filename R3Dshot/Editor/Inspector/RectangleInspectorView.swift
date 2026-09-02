@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RectangleInspectorView: View {
     @Bindable var store: EditorStore
+    @SceneStorage("R3Dshot.cropAspectRatio") private var cropAspectRatioRaw = CropAspectRatio.free.rawValue
 
     var body: some View {
         Group {
@@ -13,12 +14,34 @@ struct RectangleInspectorView: View {
                             Text("\(Int(store.cropBounds.width)) × \(Int(store.cropBounds.height)) px")
                                 .monospacedDigit()
                         }
+                        Picker("Seitenverhältnis", selection: cropAspectRatioBinding) {
+                            ForEach(CropAspectRatio.allCases) { aspectRatio in
+                                Text(aspectRatio.title).tag(aspectRatio)
+                            }
+                        }
                         Text("Ziehe auf der Arbeitsfläche einen neuen Ausschnitt auf oder verschiebe die vier Griffe.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Button("Gesamtes Bild wiederherstellen") {
                             store.resetCrop()
                         }
+                    }
+                }
+                .formStyle(.grouped)
+            } else if store.activeTool == .stepNumber && store.stepNumberCount == 0 {
+                Form {
+                    Section("Schritt") {
+                        Stepper(
+                            "Startnummer: \(store.stepNumberStart)",
+                            value: Binding(
+                                get: { store.stepNumberStart },
+                                set: { store.setStepNumberStart($0) }
+                            ),
+                            in: 1...9_999
+                        )
+                        Text("Die erste gesetzte Markierung erhält diese Nummer. Das Schrittwerkzeug bleibt für weitere Markierungen aktiv.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .formStyle(.grouped)
@@ -470,10 +493,23 @@ struct RectangleInspectorView: View {
                             var updated = style
                             updated.number = number
                             store.setSelectedStepNumberStyle(updated, actionName: "Schrittnummer ändern")
-                        }), in: 1...max(1, store.stepNumberCount))
+                        }), in: store.stepNumberStart...max(
+                            store.stepNumberStart,
+                            store.stepNumberStart + store.stepNumberCount - 1
+                        ))
                         Text("Die Nummer bestimmt die Reihenfolge; die übrigen Schritte werden automatisch nachgezogen.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        Picker("Form", selection: Binding(get: { style.shape }, set: { shape in
+                            var updated = style
+                            updated.shape = shape
+                            store.setSelectedStepNumberStyle(updated, actionName: "Schrittform ändern")
+                        })) {
+                            Text("Kreis").tag(StepNumberShape.circle)
+                            Text("Quadrat").tag(StepNumberShape.square)
+                            Text("Abgerundet").tag(StepNumberShape.roundedSquare)
+                        }
+                        .pickerStyle(.segmented)
                         ColorPicker("Füllung", selection: colorBinding(get: { style.fillColor }, set: { color in
                             var updated = style
                             updated.fillColor = color
@@ -484,18 +520,6 @@ struct RectangleInspectorView: View {
                             updated.textColor = color
                             store.setSelectedStepNumberStyle(updated, actionName: "Zahlenfarbe ändern")
                         }))
-                        LabeledContent("Schriftgröße") {
-                            HStack {
-                                Slider(value: valueBinding(get: { style.fontSize }, set: { value in
-                                    var updated = style
-                                    updated.fontSize = value
-                                    store.setSelectedStepNumberStyle(updated, actionName: "Schriftgröße ändern")
-                                }), in: 12...96)
-                                Text("\(Int(style.fontSize)) px")
-                                    .monospacedDigit()
-                                    .frame(width: 48, alignment: .trailing)
-                            }
-                        }
                     }
                     Section("Anordnung") { arrangementControls }
                 }.formStyle(.grouped)
@@ -540,6 +564,46 @@ struct RectangleInspectorView: View {
                     Section("Anordnung") { arrangementControls }
                 }
                 .formStyle(.grouped)
+            } else if let styles = store.selectedStepNumberStyles {
+                Form {
+                    Section("Schritt") {
+                        Text("\(styles.count) Schrittmarkierungen ausgewählt")
+                            .foregroundStyle(.secondary)
+                        LabeledContent("Form") {
+                            Menu {
+                                ForEach(StepNumberShape.allCases, id: \.self) { shape in
+                                    Button(shape.localizedTitle) {
+                                        store.setSelectedStepNumberShape(shape)
+                                    }
+                                }
+                            } label: {
+                                Label(
+                                    store.selectedStepNumberShape?.localizedTitle ?? "Gemischt",
+                                    systemImage: "chevron.up.chevron.down"
+                                )
+                            }
+                        }
+                        Text("Die gewählte Form wird auf alle ausgewählten Schrittmarkierungen angewendet.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Section("Anordnung") { arrangementControls }
+                }
+                .formStyle(.grouped)
+            } else if store.hasSelection {
+                VStack(spacing: 16) {
+                    ContentUnavailableView(
+                        "\(store.selectionCount) Elemente ausgewählt",
+                        systemImage: "cursorarrow.rays",
+                        description: Text("Verschiebe die Auswahl gemeinsam oder ordne, dupliziere und lösche sie über die folgenden Aktionen.")
+                    )
+
+                    Divider()
+
+                    arrangementControls
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
             } else {
                 ContentUnavailableView(
                     "Keine Auswahl",
@@ -608,6 +672,27 @@ struct RectangleInspectorView: View {
         }
     }
 
+    private var cropAspectRatioBinding: Binding<CropAspectRatio> {
+        Binding(
+            get: { CropAspectRatio(rawValue: cropAspectRatioRaw) ?? .free },
+            set: { aspectRatio in
+                cropAspectRatioRaw = aspectRatio.rawValue
+                guard aspectRatio.ratio != nil else { return }
+                let originalCrop = store.document.crop
+                store.previewCrop(
+                    aspectRatio.constrainedBounds(
+                        originalCrop.boundsInCanvasPixels,
+                        in: store.document.original.pixelSize
+                    )
+                )
+                store.commitCropChange(
+                    from: originalCrop,
+                    actionName: "Seitenverhältnis ändern"
+                )
+            }
+        )
+    }
+
     private func valueBinding(
         get: @escaping @MainActor @Sendable () -> CGFloat,
         set: @escaping @MainActor @Sendable (CGFloat) -> Void
@@ -642,5 +727,15 @@ struct RectangleInspectorView: View {
                 )
             }
         )
+    }
+}
+
+private extension StepNumberShape {
+    var localizedTitle: String {
+        switch self {
+        case .circle: "Kreis"
+        case .square: "Quadrat"
+        case .roundedSquare: "Abgerundet"
+        }
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct EditorCanvasView: View {
     @Bindable var store: EditorStore
+    @SceneStorage("R3Dshot.cropAspectRatio") private var cropAspectRatioRaw = CropAspectRatio.free.rawValue
 
     @State private var interaction: CanvasInteraction?
     @State private var draftBounds: CanvasRect?
@@ -13,6 +14,7 @@ struct EditorCanvasView: View {
     var body: some View {
         GeometryReader { geometry in
             let isCropping = store.activeTool == .crop
+            let cropAspectRatio = CropAspectRatio(rawValue: cropAspectRatioRaw) ?? .free
             let previewDocument = displayDocument(isCropping: isCropping)
             let previewImage = try? ScreenshotRenderer.render(
                 document: previewDocument,
@@ -47,7 +49,8 @@ struct EditorCanvasView: View {
                         size: surfaceSize,
                         previewImage: previewImage,
                         transform: transform,
-                        showsCropControls: isCropping
+                        showsCropControls: isCropping,
+                        cropAspectRatio: cropAspectRatio
                     )
                 }
                 .frame(
@@ -64,7 +67,8 @@ struct EditorCanvasView: View {
         size: CGSize,
         previewImage: CGImage?,
         transform: CanvasTransform,
-        showsCropControls: Bool
+        showsCropControls: Bool,
+        cropAspectRatio: CropAspectRatio
     ) -> some View {
         ZStack(alignment: .topLeading) {
             if let previewImage {
@@ -124,11 +128,20 @@ struct EditorCanvasView: View {
             }
 
             if showsCropControls {
-                CropSelectionHandles(store: store, transform: transform)
-            } else if let selectedElement = store.selectedElement {
+                CropSelectionHandles(
+                    store: store,
+                    transform: transform,
+                    aspectRatio: cropAspectRatio
+                )
+            } else if store.hasSingleSelection, let selectedElement = store.selectedElement {
                 SelectionHandles(
                     store: store,
                     element: selectedElement,
+                    transform: transform
+                )
+            } else if store.hasSelection {
+                MultipleSelectionOutlines(
+                    elements: store.selectedElements,
                     transform: transform
                 )
             }
@@ -136,7 +149,7 @@ struct EditorCanvasView: View {
         .frame(width: size.width, height: size.height)
         .contentShape(Rectangle())
         .coordinateSpace(name: CanvasCoordinateSpace.name)
-        .gesture(surfaceGesture(transform: transform))
+        .gesture(surfaceGesture(transform: transform, cropAspectRatio: cropAspectRatio))
         .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
         .accessibilityLabel("Screenshot-Arbeitsfläche")
     }
@@ -148,7 +161,10 @@ struct EditorCanvasView: View {
         return document
     }
 
-    private func surfaceGesture(transform: CanvasTransform) -> some Gesture {
+    private func surfaceGesture(
+        transform: CanvasTransform,
+        cropAspectRatio: CropAspectRatio
+    ) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(CanvasCoordinateSpace.name))
             .onChanged { value in
                 let point = transform.canvasPoint(from: value.location)
@@ -159,7 +175,13 @@ struct EditorCanvasView: View {
 
                 guard let interaction else { return }
                 switch interaction.mode {
-                case .createRectangle, .createEllipse, .createRedaction, .createCrop, .createText, .createSpeechBubble, .createPixelate, .createFocus:
+                case .createCrop:
+                    draftBounds = cropDraftBounds(
+                        from: interaction.startPoint,
+                        to: point,
+                        aspectRatio: cropAspectRatio
+                    )
+                case .createRectangle, .createEllipse, .createRedaction, .createText, .createSpeechBubble, .createPixelate, .createFocus:
                     draftBounds = CanvasRect(
                         CGRect(
                             x: interaction.startPoint.x,
@@ -200,14 +222,14 @@ struct EditorCanvasView: View {
                     break
 
                 case .move:
-                    guard let elementID = interaction.elementID,
-                          let originalBounds = interaction.originalBounds
+                    guard let originalBounds = interaction.originalBounds
                     else { return }
                     let dx = point.x - interaction.startPoint.x
                     let dy = point.y - interaction.startPoint.y
-                    store.previewBounds(
-                        movedBounds(originalBounds, dx: dx, dy: dy),
-                        for: elementID
+                    store.previewMoveSelection(
+                        from: originalBounds,
+                        dx: dx,
+                        dy: dy
                     )
                 case .idle:
                     break
@@ -249,12 +271,10 @@ struct EditorCanvasView: View {
                 case .createPixelate: if let draftBounds { store.insertPixelate(in: draftBounds) }
                 case .createFocus: if let draftBounds { store.insertFocus(in: draftBounds) }
                 case .move:
-                    if let elementID = interaction.elementID,
-                       let originalBounds = interaction.originalBounds {
-                        store.commitBoundsChange(
-                            for: elementID,
+                    if let originalBounds = interaction.originalBounds {
+                        store.commitMoveSelection(
                             from: originalBounds,
-                            actionName: "Element verschieben"
+                            actionName: "Auswahl verschieben"
                         )
                     }
                 case .idle:
@@ -328,8 +348,28 @@ struct EditorCanvasView: View {
         case .pixelate: interaction = CanvasInteraction(mode: .createPixelate, startPoint: point, elementID: nil, originalBounds: nil)
         case .focus: interaction = CanvasInteraction(mode: .createFocus, startPoint: point, elementID: nil, originalBounds: nil)
         case .select:
-            store.selectElement(at: point, tolerance: 6 / transform.scale)
-            guard let selectedElement = store.selectedElement else {
+            let modifiers = NSEvent.modifierFlags
+            let isAdding = modifiers.contains(.command) || modifiers.contains(.shift)
+            let isToggling = modifiers.contains(.command)
+            let previousSelection = store.selectedElementIDs
+            let hitElementID = store.selectElement(
+                at: point,
+                tolerance: 6 / transform.scale,
+                additive: isAdding,
+                toggling: isToggling
+            )
+
+            // A regular drag beginning on an existing member keeps a group
+            // together. Modifier clicks only change membership; they do not
+            // accidentally move the selection at the same time.
+            if !isAdding,
+               let hitElementID,
+               previousSelection.count > 1,
+               previousSelection.contains(hitElementID) {
+                store.setSelection(previousSelection)
+            }
+
+            guard !isAdding, store.hasSelection else {
                 interaction = CanvasInteraction(
                     mode: .idle,
                     startPoint: point,
@@ -341,20 +381,48 @@ struct EditorCanvasView: View {
             interaction = CanvasInteraction(
                 mode: .move,
                 startPoint: point,
-                elementID: selectedElement.id,
-                originalBounds: selectedElement.transform.boundsInCanvasPixels
+                elementID: nil,
+                originalBounds: store.selectedBoundsByElementID()
             )
         }
     }
 
-    private func movedBounds(_ original: CanvasRect, dx: CGFloat, dy: CGFloat) -> CanvasRect {
-        let size = store.document.original.pixelSize.cgSize
+    private func cropDraftBounds(
+        from start: CGPoint,
+        to point: CGPoint,
+        aspectRatio: CropAspectRatio
+    ) -> CanvasRect {
+        guard let ratio = aspectRatio.ratio else {
+            return CanvasRect(
+                CGRect(
+                    x: start.x,
+                    y: start.y,
+                    width: point.x - start.x,
+                    height: point.y - start.y
+                )
+            )
+            .clamped(to: store.document.original.pixelSize)
+        }
+
+        let horizontalDistance = abs(point.x - start.x)
+        let verticalDistance = abs(point.y - start.y)
+        let size: CGSize
+        if horizontalDistance / max(verticalDistance, .leastNonzeroMagnitude) > ratio {
+            size = CGSize(width: horizontalDistance, height: horizontalDistance / ratio)
+        } else {
+            size = CGSize(width: verticalDistance * ratio, height: verticalDistance)
+        }
+        let widthSign: CGFloat = point.x >= start.x ? 1 : -1
+        let heightSign: CGFloat = point.y >= start.y ? 1 : -1
         return CanvasRect(
-            x: min(max(0, original.x + dx), max(0, size.width - original.width)),
-            y: min(max(0, original.y + dy), max(0, size.height - original.height)),
-            width: original.width,
-            height: original.height
+            CGRect(
+                x: start.x,
+                y: start.y,
+                width: widthSign * size.width,
+                height: heightSign * size.height
+            )
         )
+        .clamped(to: store.document.original.pixelSize)
     }
 
     private func arrowDraftPath(from start: CGPoint, to end: CGPoint) -> Path {
@@ -409,7 +477,7 @@ private struct CanvasInteraction {
     let mode: Mode
     let startPoint: CGPoint
     let elementID: UUID?
-    let originalBounds: CanvasRect?
+    let originalBounds: [UUID: CanvasRect]?
 }
 
 private enum CanvasCoordinateSpace {
@@ -425,6 +493,7 @@ private enum MarkerDrawingMode {
 private struct CropSelectionHandles: View {
     let store: EditorStore
     let transform: CanvasTransform
+    let aspectRatio: CropAspectRatio
 
     var body: some View {
         let rect = transform.viewRect(from: store.cropBounds)
@@ -440,7 +509,8 @@ private struct CropSelectionHandles: View {
                 CropResizeHandle(
                     store: store,
                     corner: corner,
-                    transform: transform
+                    transform: transform,
+                    aspectRatio: aspectRatio
                 )
                 .position(corner.position(in: rect))
             }
@@ -454,6 +524,7 @@ private struct CropResizeHandle: View {
     let store: EditorStore
     let corner: ResizeCorner
     let transform: CanvasTransform
+    let aspectRatio: CropAspectRatio
 
     @State private var originalCrop: CropState?
 
@@ -473,7 +544,8 @@ private struct CropResizeHandle: View {
                         store.previewCrop(
                             corner.resized(
                                 originalCrop.boundsInCanvasPixels,
-                                to: transform.canvasPoint(from: value.location)
+                                to: transform.canvasPoint(from: value.location),
+                                aspectRatio: aspectRatio.ratio
                             )
                         )
                     }
@@ -527,13 +599,35 @@ private struct SelectionHandles: View {
                         store: store,
                         elementID: element.id,
                         corner: corner,
-                        preservesAspectRatio: element.isStepNumber,
+                        aspectRatio: element.isStepNumber ? 1 : nil,
                         transform: transform
                     )
                     .position(corner.position(in: rect))
                 }
             }
         }
+    }
+}
+
+private struct MultipleSelectionOutlines: View {
+    let elements: [AnnotationElement]
+    let transform: CanvasTransform
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(elements) { element in
+                let rect = transform.viewRect(from: element.transform.boundsInCanvasPixels)
+                Rectangle()
+                    .stroke(
+                        Color.accentColor,
+                        style: StrokeStyle(lineWidth: 1.5, dash: [5, 3])
+                    )
+                    .frame(width: rect.width, height: rect.height)
+                    .offset(x: rect.minX, y: rect.minY)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityLabel("Mehrfachauswahl")
     }
 }
 
@@ -589,7 +683,7 @@ private struct ResizeHandle: View {
     let store: EditorStore
     let elementID: UUID
     let corner: ResizeCorner
-    let preservesAspectRatio: Bool
+    let aspectRatio: CGFloat?
     let transform: CanvasTransform
 
     @State private var originalBounds: CanvasRect?
@@ -614,7 +708,7 @@ private struct ResizeHandle: View {
                             corner.resized(
                                 originalBounds,
                                 to: point,
-                                preservingAspectRatio: preservesAspectRatio
+                                aspectRatio: aspectRatio
                             ),
                             for: elementID
                         )
@@ -654,25 +748,45 @@ private enum ResizeCorner: CaseIterable, Identifiable {
     func resized(
         _ original: CanvasRect,
         to point: CGPoint,
-        preservingAspectRatio: Bool = false
+        aspectRatio: CGFloat? = nil
     ) -> CanvasRect {
         let minSize: CGFloat = 4
         let rect = original.cgRect
 
-        if preservingAspectRatio {
+        if let aspectRatio {
             switch self {
             case .topLeft:
-                let side = max(minSize, rect.maxX - point.x, rect.maxY - point.y)
-                return CanvasRect(x: rect.maxX - side, y: rect.maxY - side, width: side, height: side)
+                let size = constrainedSize(
+                    width: rect.maxX - point.x,
+                    height: rect.maxY - point.y,
+                    aspectRatio: aspectRatio,
+                    minimumSize: minSize
+                )
+                return CanvasRect(x: rect.maxX - size.width, y: rect.maxY - size.height, width: size.width, height: size.height)
             case .topRight:
-                let side = max(minSize, point.x - rect.minX, rect.maxY - point.y)
-                return CanvasRect(x: rect.minX, y: rect.maxY - side, width: side, height: side)
+                let size = constrainedSize(
+                    width: point.x - rect.minX,
+                    height: rect.maxY - point.y,
+                    aspectRatio: aspectRatio,
+                    minimumSize: minSize
+                )
+                return CanvasRect(x: rect.minX, y: rect.maxY - size.height, width: size.width, height: size.height)
             case .bottomLeft:
-                let side = max(minSize, rect.maxX - point.x, point.y - rect.minY)
-                return CanvasRect(x: rect.maxX - side, y: rect.minY, width: side, height: side)
+                let size = constrainedSize(
+                    width: rect.maxX - point.x,
+                    height: point.y - rect.minY,
+                    aspectRatio: aspectRatio,
+                    minimumSize: minSize
+                )
+                return CanvasRect(x: rect.maxX - size.width, y: rect.minY, width: size.width, height: size.height)
             case .bottomRight:
-                let side = max(minSize, point.x - rect.minX, point.y - rect.minY)
-                return CanvasRect(x: rect.minX, y: rect.minY, width: side, height: side)
+                let size = constrainedSize(
+                    width: point.x - rect.minX,
+                    height: point.y - rect.minY,
+                    aspectRatio: aspectRatio,
+                    minimumSize: minSize
+                )
+                return CanvasRect(x: rect.minX, y: rect.minY, width: size.width, height: size.height)
             }
         }
 
@@ -706,6 +820,20 @@ private enum ResizeCorner: CaseIterable, Identifiable {
                 height: max(minSize, point.y - rect.minY)
             )
         }
+    }
+
+    private func constrainedSize(
+        width: CGFloat,
+        height: CGFloat,
+        aspectRatio: CGFloat,
+        minimumSize: CGFloat
+    ) -> CGSize {
+        let proposedWidth = max(minimumSize, width)
+        let proposedHeight = max(minimumSize, height)
+        if proposedWidth / proposedHeight > aspectRatio {
+            return CGSize(width: proposedWidth, height: proposedWidth / aspectRatio)
+        }
+        return CGSize(width: proposedHeight * aspectRatio, height: proposedHeight)
     }
 }
 

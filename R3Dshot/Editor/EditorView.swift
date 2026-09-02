@@ -96,11 +96,11 @@ struct EditorView: View {
                 Button {
                     store.copySelection()
                 } label: {
-                    Label("Element kopieren", systemImage: "doc.on.doc")
+                    Label("Auswahl kopieren", systemImage: "doc.on.doc")
                 }
                 .keyboardShortcut("c", modifiers: .command)
-                .disabled(store.selectedElement == nil)
-                .help("Ausgewähltes Element kopieren (⌘C)")
+                .disabled(!store.hasSelection)
+                .help("Ausgewählte Elemente kopieren (⌘C)")
 
                 Button {
                     store.paste()
@@ -116,8 +116,8 @@ struct EditorView: View {
                     Label("Löschen", systemImage: "trash")
                 }
                 .keyboardShortcut(.delete, modifiers: [])
-                .disabled(store.selectedElement == nil)
-                .help("Ausgewähltes Element löschen (⌫)")
+                .disabled(!store.hasSelection)
+                .help("Ausgewählte Elemente löschen (⌫)")
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
