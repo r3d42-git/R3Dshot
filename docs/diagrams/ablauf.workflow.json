@@ -1,0 +1,224 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "R3Dshot · Aufnahme → Bearbeitung → Export",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "frontend": {
+          "label": "Oberfläche"
+        },
+        "backend": {
+          "label": "App-Logik"
+        },
+        "security": {
+          "label": "Berechtigung"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "aufnahme",
+      "label": "Aufnahme"
+    },
+    {
+      "id": "bilddaten",
+      "label": "Bildübernahme"
+    },
+    {
+      "id": "bearbeitung",
+      "label": "Bearbeitung"
+    },
+    {
+      "id": "ausgabe",
+      "label": "Ausgabe"
+    }
+  ],
+  "mainPath": [
+    "start",
+    "freigabe",
+    "auswahl",
+    "bild",
+    "aktion",
+    "edit",
+    "komposition",
+    "export"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "lane": "aufnahme",
+      "col": 0,
+      "type": "frontend",
+      "label": "Aufnahme starten",
+      "width": 180
+    },
+    {
+      "id": "freigabe",
+      "lane": "aufnahme",
+      "col": 1,
+      "type": "security",
+      "label": "Freigabe prüfen",
+      "width": 180
+    },
+    {
+      "id": "auswahl",
+      "lane": "aufnahme",
+      "col": 2,
+      "type": "frontend",
+      "label": "Motiv auswählen",
+      "width": 180
+    },
+    {
+      "id": "bild",
+      "lane": "bilddaten",
+      "col": 2,
+      "type": "backend",
+      "label": "Bild aufnehmen",
+      "width": 180
+    },
+    {
+      "id": "stopp",
+      "lane": "bearbeitung",
+      "col": 1,
+      "type": "security",
+      "label": "Keine Aufnahme",
+      "width": 180
+    },
+    {
+      "id": "aktion",
+      "lane": "bearbeitung",
+      "col": 2,
+      "type": "frontend",
+      "label": "Schnellaktion wählen",
+      "width": 180
+    },
+    {
+      "id": "edit",
+      "lane": "bearbeitung",
+      "col": 3,
+      "type": "frontend",
+      "label": "Bild bearbeiten",
+      "width": 180
+    },
+    {
+      "id": "komposition",
+      "lane": "bearbeitung",
+      "col": 4,
+      "type": "backend",
+      "label": "Bild rendern",
+      "width": 180
+    },
+    {
+      "id": "direkt",
+      "lane": "ausgabe",
+      "col": 2,
+      "type": "backend",
+      "label": "Original ausgeben",
+      "width": 180
+    },
+    {
+      "id": "export",
+      "lane": "ausgabe",
+      "col": 4,
+      "type": "backend",
+      "label": "Ergebnis ausgeben",
+      "width": 180
+    }
+  ],
+  "edges": [
+    {
+      "id": "auftrag",
+      "from": "start",
+      "to": "freigabe",
+      "label": "prüfen"
+    },
+    {
+      "id": "erlaubt",
+      "from": "freigabe",
+      "to": "auswahl",
+      "label": "erlaubt"
+    },
+    {
+      "id": "motiv",
+      "from": "auswahl",
+      "to": "bild",
+      "label": "bestätigt"
+    },
+    {
+      "id": "bereit",
+      "from": "bild",
+      "to": "aktion",
+      "label": "Panel aktiv"
+    },
+    {
+      "id": "editorwahl",
+      "from": "aktion",
+      "to": "edit",
+      "label": "bearbeiten"
+    },
+    {
+      "id": "ausgabewahl",
+      "from": "edit",
+      "to": "komposition",
+      "label": "Ausgabe"
+    },
+    {
+      "id": "fertig",
+      "from": "komposition",
+      "to": "export",
+      "label": "CGImage"
+    },
+    {
+      "id": "fehlend",
+      "from": "freigabe",
+      "to": "stopp",
+      "label": "fehlt",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "id": "abbruch",
+      "from": "auswahl",
+      "to": "stopp",
+      "label": "Abbruch",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "id": "direktwahl",
+      "from": "aktion",
+      "to": "direkt",
+      "label": "direkt",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Aufnahme & Abzweige",
+      "items": [
+        "Menü oder Hotkey startet Bereichs-, Fenster- oder Displayaufnahme; Overlays schließen vor dem Capture.",
+        "Panel aus: Original automatisch sichern. Panel an: bearbeiten, sichern, kopieren oder verwerfen."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Bearbeitung & Vorschau",
+      "items": [
+        "Formen, Text, Marker, Schritte, Schwärzung, Pixelierung und Fokus bleiben editierbar.",
+        "Die Vorschau nutzt ebenfalls ScreenshotRenderer; Crop begrenzt die Ausgabe."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Sichern & Kopieren",
+      "items": [
+        "Sichern: Standardordner oder bestehende Datei. Sichern unter: NSSavePanel.",
+        "PNG wird mit ImageIO codiert. Abbruch und Fehler lassen den Editor offen."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Volumes/Media/codex/R3Dshot/docs/diagrams/architektur.architecture.json",
+  "output": "/Volumes/Media/codex/R3Dshot/docs/diagrams/architektur.html",
+  "specification": {
+    "sha256": "2eda967e8c67c55b887ccd3060f2db2c8cd6eda35daecfc0cabecf43ca4aced9",
+    "bytes": 4779
+  },
+  "artifact": {
+    "sha256": "2db50a437b04768536913ab951507d00095ccc383ee78373deab9bef9cfda386",
+    "bytes": 714095
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

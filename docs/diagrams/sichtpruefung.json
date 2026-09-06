@@ -1,0 +1,75 @@
+{
+  "date": "2026-09-06",
+  "evidenceKind": "image-capable-review",
+  "scope": "Sichtprüfung der finalen READ-/Still-Screenshots, getrennt von automatischen Browsermessungen.",
+  "artifacts": [
+    {
+      "diagram_type": "architecture",
+      "output": "/Volumes/Media/codex/R3Dshot/docs/diagrams/architektur.html",
+      "specification": {
+        "sha256": "2eda967e8c67c55b887ccd3060f2db2c8cd6eda35daecfc0cabecf43ca4aced9",
+        "bytes": 4779
+      },
+      "artifact": {
+        "sha256": "2db50a437b04768536913ab951507d00095ccc383ee78373deab9bef9cfda386",
+        "bytes": 714095
+      },
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "inspectedScreenshots": [
+        "architektur.visual-check.2048x1320.light.png",
+        "architektur.visual-check.1440x900.dark.png"
+      ],
+      "observations": [
+        "Deutsche Beschriftungen und Legendenwerte lesbar; feste Viewer-UI englisch.",
+        "Keine sichtbaren Textüberlagerungen oder durch fremde Knoten laufenden Kanten.",
+        "Diagramm und Erklärungskarten passen vollständig und sind vertikal ausgewogen."
+      ],
+      "limitations": [
+        "Such-, Fokus-, Präsentations- und Exportinteraktionen wurden nicht manuell durchgespielt."
+      ]
+    },
+    {
+      "diagram_type": "workflow",
+      "output": "/Volumes/Media/codex/R3Dshot/docs/diagrams/ablauf.html",
+      "specification": {
+        "sha256": "ea53039d0dfa236ab5c794f3c0f4760e4b93fd99bca0900b12e1c0aab4ca48c8",
+        "bytes": 4551
+      },
+      "artifact": {
+        "sha256": "564e2fd00957622bd38442663c30d63af0558fa4a5979d29edbf33601079aae1",
+        "bytes": 713546
+      },
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "inspectedScreenshots": [
+        "ablauf.visual-check.2048x1320.dark.png",
+        "ablauf.visual-check.1440x900.light.png"
+      ],
+      "observations": [
+        "Deutsche Beschriftungen und Legendenwerte lesbar; feste Viewer-UI englisch.",
+        "Keine sichtbaren Textüberlagerungen oder durch fremde Knoten laufenden Kanten.",
+        "Diagramm und Erklärungskarten passen vollständig und sind vertikal ausgewogen."
+      ],
+      "limitations": [
+        "Such-, Fokus-, Präsentations- und Exportinteraktionen wurden nicht manuell durchgespielt."
+      ]
+    }
+  ]
+}

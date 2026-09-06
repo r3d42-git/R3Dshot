@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Volumes/Media/codex/R3Dshot/docs/diagrams/ablauf.workflow.json",
+  "output": "/Volumes/Media/codex/R3Dshot/docs/diagrams/ablauf.html",
+  "specification": {
+    "sha256": "ea53039d0dfa236ab5c794f3c0f4760e4b93fd99bca0900b12e1c0aab4ca48c8",
+    "bytes": 4551
+  },
+  "artifact": {
+    "sha256": "564e2fd00957622bd38442663c30d63af0558fa4a5979d29edbf33601079aae1",
+    "bytes": 713546
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

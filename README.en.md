@@ -24,6 +24,12 @@ This working state extends the editor with:
 - Step markers: Circle, square, and rounded-square variants are available. Their number is optically centred and scales automatically when the marker is enlarged or reduced. The Step tool remains active after placement so consecutive numbers can be placed; clicking the Select tool ends that mode. The starting number is chosen before the first marker is placed, allowing a sequence to begin at, for example, 5.
 - Cropping: In addition to freeform cropping, the optional 1:1, 16:9, and 4:3 aspect ratios are available; they apply when drawing and when resizing with the handles.
 
+## Architecture and workflow
+
+The code-based Archify diagrams show the [architecture](docs/diagrams/architektur.html) and the [capture → editing → export workflow](docs/diagrams/ablauf.html), with German labels. Download the HTML files and open them locally in a browser.
+
+[Previews, code references, and verification records](docs/diagrams/README.md), together with the editable JSON sources, are included under `docs/diagrams/`.
+
 ## Build and run locally
 
     ./script/build_and_run.sh

@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "R3Dshot · Architekturübersicht",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "frontend": {
+          "label": "Oberfläche"
+        },
+        "backend": {
+          "label": "App-Logik"
+        },
+        "security": {
+          "label": "Berechtigung"
+        }
+      }
+    }
+  },
+  "components": [
+    {
+      "id": "eingang",
+      "type": "frontend",
+      "label": "Menüleiste & Hotkeys",
+      "sublabel": "MenuBarController · Carbon",
+      "pos": [
+        40,
+        200
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "app",
+      "type": "backend",
+      "label": "App-Steuerung",
+      "sublabel": "R3DshotAppDelegate",
+      "pos": [
+        370,
+        200
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "capture",
+      "type": "backend",
+      "label": "Aufnahmekoordination",
+      "sublabel": "CaptureCoordinator",
+      "pos": [
+        700,
+        200
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "pending",
+      "type": "backend",
+      "label": "Offene Aufnahmen",
+      "sublabel": "PendingCaptureStore · CGImage",
+      "pos": [
+        1030,
+        200
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "prefs",
+      "type": "backend",
+      "label": "Einstellungen",
+      "sublabel": "PreferencesStore · ShortcutStore",
+      "pos": [
+        370,
+        30
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "permission",
+      "type": "security",
+      "label": "Bildschirmfreigabe",
+      "sublabel": "ScreenRecordingPermissionService",
+      "pos": [
+        700,
+        30
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "quick",
+      "type": "frontend",
+      "label": "Schnellaktionen",
+      "sublabel": "QuickActionPanelController",
+      "pos": [
+        1030,
+        480
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "editor",
+      "type": "frontend",
+      "label": "Editor & Dokumentzustand",
+      "sublabel": "EditorWindowController · EditorStore",
+      "pos": [
+        700,
+        480
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "renderer",
+      "type": "backend",
+      "label": "Gemeinsamer Renderer",
+      "sublabel": "ScreenshotRenderer",
+      "pos": [
+        370,
+        480
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "output",
+      "type": "backend",
+      "label": "PNG & Zwischenablage",
+      "sublabel": "ScreenshotFileStore",
+      "pos": [
+        40,
+        480
+      ],
+      "size": [
+        220,
+        76
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "ausloesen",
+      "from": "eingang",
+      "to": "app",
+      "label": "Auftrag"
+    },
+    {
+      "id": "starten",
+      "from": "app",
+      "to": "capture",
+      "label": "Start"
+    },
+    {
+      "id": "halten",
+      "from": "capture",
+      "to": "pending",
+      "label": "onCapture"
+    },
+    {
+      "id": "konfigurieren",
+      "from": "prefs",
+      "to": "app",
+      "label": "Vorgaben",
+      "labelDy": 60
+    },
+    {
+      "id": "pruefen",
+      "from": "capture",
+      "to": "permission",
+      "label": "prüfen"
+    },
+    {
+      "id": "anzeigen",
+      "from": "pending",
+      "to": "quick",
+      "label": "anzeigen",
+      "labelDy": 60
+    },
+    {
+      "id": "bearbeiten",
+      "from": "quick",
+      "to": "editor",
+      "label": "öffnen"
+    },
+    {
+      "id": "rendern",
+      "from": "editor",
+      "to": "renderer",
+      "label": "Bild + Zustand"
+    },
+    {
+      "id": "schreiben",
+      "from": "renderer",
+      "to": "output",
+      "label": "CGImage"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Aufnahme auf macOS",
+      "items": [
+        "ScreenCaptureKit liefert CGImage; Auswahl-Overlays werden vorher entfernt.",
+        "Ein Display: Aufnahme + Zuschnitt. Mehrere: direkte Rechteck-API."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Nicht-destruktive Bearbeitung",
+      "items": [
+        "EditorSession hält das Original; ScreenshotDocument enthält Crop und Annotationen.",
+        "Bildpixel, stabile IDs und UndoManager; gleicher Renderer für Vorschau und Export."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Steuerung & Ausgabe",
+      "items": [
+        "Pfeile zeigen den fachlichen Hauptweg; der AppDelegate vermittelt die Übergaben.",
+        "Schnellaktionen können das Original direkt ausgeben. Nur offene Editoren erzeugen ein Dock-Symbol."
+      ]
+    }
+  ]
+}

@@ -24,6 +24,12 @@ Dieser Arbeitsstand ergänzt den Editor um:
 - Schrittmarkierungen: Kreis, Quadrat und abgerundetes Quadrat stehen als Formvarianten bereit. Ihre Zahl wird optisch zentriert und skaliert beim Vergrößern oder Verkleinern automatisch mit dem Marker. Das Schritt-Werkzeug bleibt nach dem Platzieren aktiv, damit fortlaufende Nummern gesetzt werden können; ein Klick auf das Auswahlwerkzeug beendet diesen Modus. Die Startnummer wird vor dem ersten Platzieren gewählt, sodass eine Folge beispielsweise bei 5 beginnen kann.
 - Zuschneiden: Neben dem freien Ausschnitt sind die optionalen Seitenverhältnisse 1:1, 16:9 und 4:3 verfügbar; sie gelten beim Aufziehen und beim Skalieren über die Griffe.
 
+## Architektur und Ablauf
+
+Die anhand des Codes erstellten Archify-Diagramme zeigen die [Architekturübersicht](docs/diagrams/architektur.html) und den [Ablauf Aufnahme → Bearbeitung → Export](docs/diagrams/ablauf.html). Die HTML-Dateien herunterladen und lokal im Browser öffnen.
+
+[Vorschauen, Codebelege und Prüfnachweise](docs/diagrams/README.md) sowie die bearbeitbaren JSON-Quellen liegen im Projekt unter `docs/diagrams/`.
+
 ## Lokal bauen und starten
 
     ./script/build_and_run.sh

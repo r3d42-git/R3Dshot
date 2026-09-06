@@ -1,6 +1,15 @@
 # R3Dshot – Projektübergabe
 
-Stand: 3. September 2026
+Stand: 6. September 2026
+
+## Architekturdiagramme (6. September 2026)
+
+- Auf Basis dieser Übergabe und des aktuellen Codes wurden mit Archify eine [Architekturübersicht](docs/diagrams/architektur.html) und der [Ablauf Aufnahme → Bearbeitung → Export](docs/diagrams/ablauf.html) mit deutschen Beschriftungen erstellt.
+- [Quellen, Ablaufdetails und Prüfnachweise](docs/diagrams/README.md) stehen zusammen mit den bearbeitbaren JSON-Spezifikationen unter `docs/diagrams/`.
+- Beide HTML-Artefakte bestehen alle neun Showcase-Prüfungen ohne Fehler oder Warnungen. Die Browserprüfung umfasst vier Desktopgrößen sowie Hell-/Dunkel-Screenshots; die Sichtprüfung ist separat dokumentiert.
+- Die Diagramme berücksichtigen Abweichungen vom früheren Entwurf: Originalbild im Speicher, gemeinsamer Preview-/Export-Renderer, Displayaufnahme mit Zuschnitt für Ein-Display-Bereiche und direkte Rechteck-API als displayübergreifender Fallback.
+- Die deutschen und englischen Projekt-READMEs verlinken die Diagramme; PNG-Vorschauen sind direkt auf GitHub in der Diagrammdokumentation sichtbar.
+- Es wurde nur Dokumentation ergänzt; die bestehenden offenen manuellen App-Abnahmen bleiben unverändert.
 
 ## Als Nächstes
 
