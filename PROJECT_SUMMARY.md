@@ -1,6 +1,21 @@
 # R3Dshot – Projektübergabe
 
-Stand: 6. September 2026
+Stand: 15. September 2026
+
+## macOS-27-Kompatibilitätsprüfung (15. September 2026)
+
+- Geprüfter Quellstand: `3524842`, vor der Prüfung sauberer Arbeitsbaum. Keine App-Codeänderungen erforderlich oder vorgenommen.
+- Tatsächliche Testumgebung: macOS 27.0 (`26A428`), Xcode 27.0 (`27A266a`), macOS-SDK 27.0, Apple Silicon.
+- `./script/test_editor_model.sh`: erfolgreich, Ausgabe `Editor model/renderer smoke test passed`. Der erste Sandbox-Versuch scheiterte am nicht beschreibbaren Swift-Modulcache; unverändert außerhalb der Sandbox erfolgreich.
+- `./script/build_and_run.sh --verify`: erfolgreich; Debug-App mit stabiler Apple-Development-Signatur gebaut, gestartet und Prozessprüfung bestanden. Build-Protokoll lokal unter `/tmp/r3dshot-macos27-build.log` (temporär).
+- Keine Compilerfehler oder Quellcodewarnungen. Einziger `warning:`-Eintrag: App-Intents-Metadatenextraktion übersprungen, weil die App keine AppIntents-Abhängigkeit hat.
+- `vtool -show-build` bestätigt im erzeugten arm64-Binary SDK 27.0 und unverändert Mindestversion 15.2. Die Mindestversion ist keine erneute Laufzeitabnahme auf macOS 15.2.
+- `codesign --verify --deep --strict` außerhalb der Sandbox erfolgreich; der anfängliche Sandbox-Trust-Fehler war dort nicht reproduzierbar. Der Prozess der frisch gebauten App lief bei der Nachprüfung weiterhin.
+- Codeprüfung: Aufnahmen verwenden ScreenCaptureKit (`SCShareableContent`, `SCScreenshotManager`); keine Verwendung von `CGWindowListCreateImage` oder `CGDisplayCreateImage` gefunden. Globale Tastenkürzel verwenden weiterhin Carbon `RegisterEventHotKey`; der erfolgreiche Build belegt dessen SDK-Verfügbarkeit, nicht die tatsächliche Tastenzustellung. Berechtigungen und Fenster-Lifecycle benötigen weiterhin Laufzeitabnahme.
+- Automatischer UI-Zugriff auf die frisch gebaute App lief in einen Timeout; keine automatisierte UI-Abnahme erfolgt.
+- Manuelle Nutzerprüfung anschließend bestätigt: Aufnahme, Hotkeys und Editor wurden unter macOS 27 getestet, ohne festgestellte Auffälligkeiten.
+- Ergebnis: Die macOS-27-Kompatibilitätsprüfung ist für den geprüften Umfang erfolgreich abgeschlossen: Build, Modell/Renderer, Prozessstart und Signatur technisch bestätigt; Aufnahme, Hotkeys und Editor durch den Nutzer bestätigt. Kein konkreter Anpassungsbedarf festgestellt. Einzelne Display-/Skalierungskombinationen, erstmalige Berechtigungsvergabe, Quick Actions, PNG-Export, Lifecycle-Sonderfälle und sämtliche Phase-7-Einzelinteraktionen wurden in der Rückmeldung nicht separat aufgeschlüsselt; daraus wird keine zusätzliche Detailabnahme abgeleitet.
+- Kein Release erstellt; die veröffentlichte 0.1.0-App wurde in dieser Prüfung nicht separat auf macOS 27 getestet.
 
 ## Architekturdiagramme (6. September 2026)
 

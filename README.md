@@ -10,6 +10,12 @@ English version: [README.en.md](README.en.md)
 - macOS 15.2 oder neuer
 - Xcode 26.6 oder neuer für lokale Entwicklung
 
+### macOS 27 geprüft
+
+Am 15. September 2026 wurde der aktuelle Quellstand unter macOS 27.0 auf Apple Silicon mit Xcode 27 und dem macOS-27-SDK erfolgreich gebaut und gestartet. Modell-/Renderer-Tests und Signaturprüfung bestanden; bei der manuellen Prüfung von Aufnahme, globalen Hotkeys und Editor wurden keine Auffälligkeiten festgestellt. Für den geprüften Umfang waren keine Codeanpassungen nötig.
+
+Dieser Hinweis dokumentiert die Prüfung des aktuellen Quellstands; das bestehende Release 0.1.0 bleibt unverändert. Details zum Prüfumfang stehen in der [Projektübergabe](PROJECT_SUMMARY.md#macos-27-kompatibilitätsprüfung-15-september-2026).
+
 ## Aktueller Entwicklungsstand
 
 Die umgesetzten Editorphasen umfassen die Menüleisten-App, konfigurierbare globale Auslöser, die Screen-Recording-Berechtigung sowie Bereichs-, Fenster- und Bildschirmaufnahme. Screenshots werden in unabhängigen Editorfenstern geöffnet und lassen sich als PNG sichern, in die Zwischenablage kopieren oder über die Quick Action weitergeben.

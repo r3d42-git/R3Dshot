@@ -10,6 +10,12 @@ Deutsche Fassung: [README.md](README.md)
 - macOS 15.2 or later
 - Xcode 26.6 or later for local development
 
+### Tested on macOS 27
+
+On September 15, 2026, the current source revision was successfully built and launched on macOS 27.0 on Apple Silicon using Xcode 27 and the macOS 27 SDK. Model/renderer tests and signature verification passed. Manual testing of capture, global hotkeys, and the editor revealed no issues. No code changes were needed for the tested scope.
+
+This note records testing of the current source revision; the existing 0.1.0 release remains unchanged. See the [project handoff](PROJECT_SUMMARY.md#macos-27-kompatibilitätsprüfung-15-september-2026) (German) for the test scope.
+
 ## Current development status
 
 The implemented editor phases cover the menu-bar app, configurable global triggers, Screen Recording permission, and area, window, and screen capture. Screenshots open in independent editor windows and can be saved as PNG files, copied to the clipboard, or passed on through Quick Action.
