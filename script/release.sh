@@ -15,7 +15,8 @@ fi
 APP_NAME="R3Dshot"
 BUNDLE_ID="org.r3d.R3Dshot"
 TEAM_ID="${R3DSHOT_TEAM_ID:-G6JH37W285}"
-SIGNING_IDENTITY="${R3DSHOT_SIGNING_IDENTITY:-Developer ID Application: Philipp John Hild (G6JH37W285)}"
+# Pin the certificate fingerprint to distinguish certificates with the same name.
+SIGNING_IDENTITY="${R3DSHOT_SIGNING_IDENTITY:-D548540E7FE1BD9B3C4518CC02D8786E1BFEB885}"
 NOTARY_PROFILE="${R3DSHOT_NOTARY_PROFILE:-R3Dshot}"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RELEASE_DIR="$ROOT_DIR/.release/$VERSION"
@@ -52,8 +53,11 @@ if ! rg -qF "MARKETING_VERSION = $VERSION;" "$ROOT_DIR/R3Dshot.xcodeproj/project
   exit 1
 fi
 available_identities="$(/usr/bin/security find-identity -v -p codesigning)"
-if ! rg -qF "$SIGNING_IDENTITY" <<< "$available_identities"; then
-  echo "Developer ID identity is unavailable: $SIGNING_IDENTITY" >&2
+SIGNING_FINGERPRINT="$(awk -v identity="$SIGNING_IDENTITY" '
+  $2 == toupper(identity) || index($0, "\"" identity "\"") { print $2 }
+' <<< "$available_identities")"
+if [[ ! "$SIGNING_FINGERPRINT" =~ ^[A-Fa-f0-9]{40}$ ]]; then
+  echo "Developer ID identity is unavailable or ambiguous: $SIGNING_IDENTITY. Set R3DSHOT_SIGNING_IDENTITY to its SHA-1 fingerprint." >&2
   exit 1
 fi
 
@@ -78,7 +82,7 @@ xcodebuild archive \
   -destination 'generic/platform=macOS' \
   -archivePath "$ARCHIVE_PATH" \
   CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+  CODE_SIGN_IDENTITY="$SIGNING_FINGERPRINT" \
   CODE_SIGNING_REQUIRED=YES \
   CODE_SIGNING_ALLOWED=YES \
   DEVELOPMENT_TEAM="$TEAM_ID" \
@@ -99,7 +103,10 @@ fi
 
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 codesign -dvv --verbose=4 "$APP_BUNDLE" 2>&1 | tee "$RELEASE_DIR/$APP_NAME.codesign.txt"
-if ! rg -qF "Authority=$SIGNING_IDENTITY" "$RELEASE_DIR/$APP_NAME.codesign.txt" \
+codesign -d --extract-certificates="$TEMP_DIR/app-signing-" "$APP_BUNDLE"
+app_signing_fingerprint="$(shasum -a 1 "$TEMP_DIR/app-signing-0" | awk '{ print toupper($1) }')"
+if [[ "$app_signing_fingerprint" != "$SIGNING_FINGERPRINT" ]] \
+  || ! rg -q '^Authority=Developer ID Application:' "$RELEASE_DIR/$APP_NAME.codesign.txt" \
   || ! rg -qF "TeamIdentifier=$TEAM_ID" "$RELEASE_DIR/$APP_NAME.codesign.txt" \
   || ! rg -q 'flags=.*runtime' "$RELEASE_DIR/$APP_NAME.codesign.txt"; then
   echo "The archived app does not meet the Developer ID, team, or Hardened Runtime contract." >&2
@@ -170,7 +177,7 @@ APPLESCRIPT
 hdiutil detach "$MOUNT_POINT" -quiet
 MOUNT_POINT=""
 hdiutil convert "$RW_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG_PATH" >/dev/null
-codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$DMG_PATH"
+codesign --force --sign "$SIGNING_FINGERPRINT" --timestamp "$DMG_PATH"
 
 DMG_NOTARY_JSON="$RELEASE_DIR/$APP_NAME-dmg-notarization.json"
 echo "Submitting the final DMG to Apple Notary Service (usually a few minutes)."

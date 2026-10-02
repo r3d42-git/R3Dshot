@@ -17,6 +17,12 @@ Stand: 15. September 2026
 - Ergebnis: Die macOS-27-Kompatibilitätsprüfung ist für den geprüften Umfang erfolgreich abgeschlossen: Build, Modell/Renderer, Prozessstart und Signatur technisch bestätigt; Aufnahme, Hotkeys und Editor durch den Nutzer bestätigt. Kein konkreter Anpassungsbedarf festgestellt. Einzelne Display-/Skalierungskombinationen, erstmalige Berechtigungsvergabe, Quick Actions, PNG-Export, Lifecycle-Sonderfälle und sämtliche Phase-7-Einzelinteraktionen wurden in der Rückmeldung nicht separat aufgeschlüsselt; daraus wird keine zusätzliche Detailabnahme abgeleitet.
 - Kein Release erstellt; die veröffentlichte 0.1.0-App wurde in dieser Prüfung nicht separat auf macOS 27 getestet.
 
+## Geplant: Wartungsrelease 0.1.1 (noch nicht veröffentlicht)
+
+- Versionsquellen auf 0.1.1 / Build 2 vorbereitet und `docs/releases/0.1.1.md` für den nativen Publisher angelegt.
+- Anlass ist der Wechsel auf das erneuerte Developer-ID-Zertifikat von Team G6JH37W285; App-Funktionen wurden dafür nicht geändert.
+- Archiv, Notarisierung, GitHub-Tag und Release sowie die Prüfung des veröffentlichten Downloads stehen noch aus. Neue UI-Abnahme wird hier nicht behauptet.
+
 ## Architekturdiagramme (6. September 2026)
 
 - Auf Basis dieser Übergabe und des aktuellen Codes wurden mit Archify eine [Architekturübersicht](docs/diagrams/architektur.html) und der [Ablauf Aufnahme → Bearbeitung → Export](docs/diagrams/ablauf.html) mit deutschen Beschriftungen erstellt.
