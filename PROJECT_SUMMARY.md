@@ -1,6 +1,6 @@
 # R3Dshot – Projektübergabe
 
-Stand: 15. September 2026
+Stand: 2. Oktober 2026
 
 ## macOS-27-Kompatibilitätsprüfung (15. September 2026)
 
@@ -17,11 +17,13 @@ Stand: 15. September 2026
 - Ergebnis: Die macOS-27-Kompatibilitätsprüfung ist für den geprüften Umfang erfolgreich abgeschlossen: Build, Modell/Renderer, Prozessstart und Signatur technisch bestätigt; Aufnahme, Hotkeys und Editor durch den Nutzer bestätigt. Kein konkreter Anpassungsbedarf festgestellt. Einzelne Display-/Skalierungskombinationen, erstmalige Berechtigungsvergabe, Quick Actions, PNG-Export, Lifecycle-Sonderfälle und sämtliche Phase-7-Einzelinteraktionen wurden in der Rückmeldung nicht separat aufgeschlüsselt; daraus wird keine zusätzliche Detailabnahme abgeleitet.
 - Kein Release erstellt; die veröffentlichte 0.1.0-App wurde in dieser Prüfung nicht separat auf macOS 27 getestet.
 
-## Geplant: Wartungsrelease 0.1.1 (noch nicht veröffentlicht)
+## Abgeschlossener G2-Release 0.1.1 — 2026-10-02
 
-- Versionsquellen auf 0.1.1 / Build 2 vorbereitet und `docs/releases/0.1.1.md` für den nativen Publisher angelegt.
-- Anlass ist der Wechsel auf das erneuerte Developer-ID-Zertifikat von Team G6JH37W285; App-Funktionen wurden dafür nicht geändert.
-- Archiv, Notarisierung, GitHub-Tag und Release sowie die Prüfung des veröffentlichten Downloads stehen noch aus. Neue UI-Abnahme wird hier nicht behauptet.
+- [0.1.1](https://github.com/r3d42-git/R3Dshot/releases/tag/v0.1.1) veröffentlicht. Annotierter Tag `v0.1.1` bleibt auf Quellcommit `26f4624b64fc4975883ea7bd8253c608b9a78ab9`; Abschlussnachweise folgen separat.
+- Vorhandener Modell-/Renderer-Test und native lokale sowie Download-Verifikation erfolgreich.
+- Apple-Submission(s) `f404c87b-57e0-40b1-b29b-9ee50f01d317 / 070c4a97-8629-4b41-9ca8-e9b62603701a`: Accepted; angeheftetes App-Ticket im finalen Paket geprüft. Bei DMGs trägt auch der Container ein eigenes gültiges Ticket.
+- Frischer GitHub-Download: SHA-256 `5fe4a46092003ab8efbff9dea36e7f0b4eae86bd5ce0188c800aec4aab16889d`, strikte Signatur, Bundle-Metadaten, Architektur, Stapling und Gatekeeper erfolgreich. Zusätzliche Leaf-Prüfung bestätigt exakt G2 `D548540E7FE1BD9B3C4518CC02D8786E1BFEB885`.
+- Asset `R3Dshot-0.1.1-mac-arm64.dmg`, Version/Build `0.1.1/2`, Bundle-ID `org.r3d.R3Dshot`. Keine neue manuelle UI-Abnahme abgeleitet.
 
 ## Architekturdiagramme (6. September 2026)
 
