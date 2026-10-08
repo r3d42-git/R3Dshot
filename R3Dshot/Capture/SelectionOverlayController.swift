@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import ScreenCaptureKit
 
 /// Displays short-lived selection panels above every screen.
@@ -14,28 +15,39 @@ final class SelectionOverlayController {
     }
 
     private var panels: [SelectionOverlayPanel] = []
+    private var selectionID: UUID?
+    private var startupFocusTask: Task<Void, Never>?
+    private var focusLossTask: Task<Void, Never>?
+    private var isStarting = false
+    private var interruptionObservers: [(NotificationCenter, NSObjectProtocol)] = []
     private var mode: Mode?
     private var areaCompletion: ((CGRect) -> Void)?
     private var displayCompletion: ((NSScreen) -> Void)?
     private var windowCompletion: ((SCWindow) -> Void)?
     private var cancellationCompletion: (() -> Void)?
-    private var previouslyActiveApplication: NSRunningApplication?
-    private var activatedApplicationForSelection = false
+    private let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "org.r3d.r3dshot",
+        category: "Selection"
+    )
+
+    var isSelecting: Bool { mode != nil }
 
     func beginAreaSelection(
         onSelection: @escaping (CGRect) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        start(mode: .area, onCancel: onCancel)
+        dismiss()
         areaCompletion = onSelection
+        start(mode: .area, onCancel: onCancel)
     }
 
     func beginDisplaySelection(
         onSelection: @escaping (NSScreen) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        start(mode: .display, onCancel: onCancel)
+        dismiss()
         displayCompletion = onSelection
+        start(mode: .display, onCancel: onCancel)
     }
 
     func beginWindowSelection(
@@ -43,14 +55,24 @@ final class SelectionOverlayController {
         onSelection: @escaping (SCWindow) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        start(mode: .window(windows), onCancel: onCancel)
+        dismiss()
         windowCompletion = onSelection
+        start(mode: .window(windows), onCancel: onCancel)
     }
 
     /// Removes every overlay from the window server before a direct rect
     /// capture. The caller then yields once to let the compositor present that
     /// removal before invoking `SCScreenshotManager`.
     func dismiss() {
+        // Invalidate first: closing a panel can synchronously resign key status.
+        selectionID = nil
+        startupFocusTask?.cancel()
+        startupFocusTask = nil
+        focusLossTask?.cancel()
+        focusLossTask = nil
+        isStarting = false
+        interruptionObservers.forEach { $0.0.removeObserver($0.1) }
+        interruptionObservers.removeAll()
         panels.forEach { $0.close() }
         panels.removeAll()
         mode = nil
@@ -58,59 +80,95 @@ final class SelectionOverlayController {
         displayCompletion = nil
         windowCompletion = nil
         cancellationCompletion = nil
-        restorePreviousApplicationIfNeeded()
     }
 
     private func start(mode: Mode, onCancel: @escaping () -> Void) {
-        dismiss()
+        let id = UUID()
+        selectionID = id
+        isStarting = true
         self.mode = mode
         cancellationCompletion = onCancel
-        activateApplicationForSelectionIfNeeded()
 
         panels = NSScreen.screens.map { screen in
-            SelectionOverlayPanel(screen: screen, owner: self)
+            SelectionOverlayPanel(screen: screen, owner: self, selectionID: id)
         }
 
+        guard !panels.isEmpty else {
+            cancel()
+            return
+        }
+        observeInterruptions(for: id)
         panels.forEach { $0.orderFrontRegardless() }
         pointerMoved(to: NSEvent.mouseLocation)
         refreshCursorOwnership()
+        logger.info("Selection overlays shown: \(self.panels.count, privacy: .public) panels")
 
-        // Application activation can complete one event-loop turn after the
-        // request. Refresh the key panel and its native cursor rect once AppKit
-        // has had a chance to finish the transition.
-        Task { @MainActor [weak self] in
+        // Menu tracking can release focus after the command returns. Allow one
+        // bounded retry, then either retain a usable selection or cancel it.
+        // Never keep reclaiming focus from the user's other windows.
+        startupFocusTask = Task { @MainActor [weak self] in
             await Task.yield()
-            self?.refreshCursorOwnership()
-        }
-    }
-
-    private func activateApplicationForSelectionIfNeeded() {
-        guard !NSApp.isActive else { return }
-
-        let currentProcessIdentifier = ProcessInfo.processInfo.processIdentifier
-        let frontmostApplication = NSWorkspace.shared.frontmostApplication
-        if frontmostApplication?.processIdentifier != currentProcessIdentifier {
-            previouslyActiveApplication = frontmostApplication
-        }
-
-        activatedApplicationForSelection = true
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    private func restorePreviousApplicationIfNeeded() {
-        guard activatedApplicationForSelection else { return }
-
-        let applicationToRestore = previouslyActiveApplication
-        previouslyActiveApplication = nil
-        activatedApplicationForSelection = false
-
-        if let applicationToRestore, !applicationToRestore.isTerminated {
-            NSApp.yieldActivation(to: applicationToRestore)
-            if !applicationToRestore.activate() {
-                NSApp.deactivate()
+            guard let self, self.selectionID == id, !Task.isCancelled else { return }
+            if !self.hasSelectionFocus { self.refreshCursorOwnership() }
+            do { try await Task.sleep(nanoseconds: 250_000_000) }
+            catch { return }
+            guard self.selectionID == id else { return }
+            self.isStarting = false
+            self.startupFocusTask = nil
+            if !self.hasSelectionFocus {
+                self.logger.notice("Selection could not retain keyboard focus")
+                self.cancel()
             }
-        } else {
-            NSApp.deactivate()
+        }
+    }
+
+    private var hasSelectionFocus: Bool {
+        panels.contains { $0.isVisible && $0.isKeyWindow && $0.firstResponder === $0.selectionView }
+    }
+
+    fileprivate func ownsSelection(_ id: UUID) -> Bool { selectionID == id }
+
+    fileprivate func panelFocusChanged(selectionID id: UUID, gainedFocus: Bool) {
+        guard selectionID == id else { return }
+        if gainedFocus {
+            focusLossTask?.cancel()
+            focusLossTask = nil
+            return
+        }
+        guard !isStarting else { return }
+        focusLossTask?.cancel()
+        // Key status may briefly be absent while crossing between displays.
+        // Check the whole selection after that transfer has settled.
+        focusLossTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(nanoseconds: 150_000_000) }
+            catch { return }
+            guard let self, self.selectionID == id else { return }
+            self.focusLossTask = nil
+            if !self.hasSelectionFocus {
+                self.logger.info("Selection lost keyboard focus")
+                self.cancel()
+            }
+        }
+    }
+
+    private func observeInterruptions(for id: UUID) {
+        let notifications: [(NotificationCenter, Notification.Name)] = [
+            (.default, NSApplication.didChangeScreenParametersNotification),
+            (.default, NSApplication.didHideNotification),
+            (NSWorkspace.shared.notificationCenter, NSWorkspace.activeSpaceDidChangeNotification),
+            (NSWorkspace.shared.notificationCenter, NSWorkspace.willSleepNotification),
+            (NSWorkspace.shared.notificationCenter, NSWorkspace.screensDidSleepNotification),
+            (NSWorkspace.shared.notificationCenter, NSWorkspace.sessionDidResignActiveNotification)
+        ]
+        for (center, name) in notifications {
+            let observer = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self, self.selectionID == id else { return }
+                    self.logger.info("Selection interrupted by workspace or display change")
+                    self.cancel()
+                }
+            }
+            interruptionObservers.append((center, observer))
         }
     }
 
@@ -120,6 +178,10 @@ final class SelectionOverlayController {
         let mouseLocation = NSEvent.mouseLocation
         let panel = panels.first { $0.frame.contains(mouseLocation) } ?? panels.first
         panel?.makeKeyAndOrderFront(nil)
+        if let panel {
+            panel.makeFirstResponder(panel.selectionView)
+            logger.debug("Selection focus refreshed: visible=\(panel.isVisible, privacy: .public), key=\(panel.isKeyWindow, privacy: .public)")
+        }
         panel?.selectionView.activateCrosshairCursor()
     }
 
@@ -182,6 +244,8 @@ final class SelectionOverlayController {
     }
 
     fileprivate func cancel() {
+        guard isSelecting else { return }
+        logger.info("Selection cancelled")
         let completion = cancellationCompletion
         dismiss()
         completion?()
@@ -213,17 +277,22 @@ final class SelectionOverlayController {
 
 private final class SelectionOverlayPanel: NSPanel {
     let selectionView: SelectionOverlayView
+    private weak var owner: SelectionOverlayController?
+    private let selectionID: UUID
 
-    init(screen: NSScreen, owner: SelectionOverlayController) {
-        selectionView = SelectionOverlayView(screen: screen, owner: owner)
+    init(screen: NSScreen, owner: SelectionOverlayController, selectionID: UUID) {
+        self.owner = owner
+        self.selectionID = selectionID
+        selectionView = SelectionOverlayView(screen: screen, owner: owner, selectionID: selectionID)
 
         super.init(
             contentRect: screen.frame,
-            styleMask: [.borderless],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
+        title = "R3Dshot – Aufnahme auswählen"
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
@@ -232,15 +301,46 @@ private final class SelectionOverlayPanel: NSPanel {
         ignoresMouseEvents = false
         acceptsMouseMovedEvents = true
         becomesKeyOnlyIfNeeded = false
+        // Selection must stay visible while the menu-bar app is inactive.
+        // A nonactivating panel takes keyboard focus without activating the
+        // accessory app or disturbing the app being captured.
+        hidesOnDeactivate = false
+        isReleasedWhenClosed = false
+        isRestorable = false
+        selectionView.autoresizingMask = [.width, .height]
         contentView = selectionView
+        setFrame(screen.frame, display: false)
+    }
+
+    override func becomeKey() {
+        super.becomeKey()
+        owner?.panelFocusChanged(selectionID: selectionID, gainedFocus: true)
+    }
+
+    override func resignKey() {
+        super.resignKey()
+        owner?.panelFocusChanged(selectionID: selectionID, gainedFocus: false)
     }
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    // Overlays cover the entire display, including its menu bar and Dock;
+    // AppKit's ordinary visible-frame constraint is inappropriate here.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        frameRect
+    }
 }
 
 private final class SelectionOverlayView: NSView {
-    private weak var owner: SelectionOverlayController?
+    private weak var selectionOwner: SelectionOverlayController?
+    private let selectionID: UUID
+    // Retired panels can still have queued events. They must not select,
+    // cancel, or acquire focus for a replacement selection.
+    private var owner: SelectionOverlayController? {
+        guard selectionOwner?.ownsSelection(selectionID) == true else { return nil }
+        return selectionOwner
+    }
     private let screen: NSScreen
     private var areaStart: CGPoint?
     private var areaRect: CGRect?
@@ -248,9 +348,10 @@ private final class SelectionOverlayView: NSView {
     private var pointerLocation: CGPoint?
     private var trackingArea: NSTrackingArea?
 
-    init(screen: NSScreen, owner: SelectionOverlayController) {
+    init(screen: NSScreen, owner: SelectionOverlayController, selectionID: UUID) {
         self.screen = screen
-        self.owner = owner
+        self.selectionOwner = owner
+        self.selectionID = selectionID
         super.init(frame: CGRect(origin: .zero, size: screen.frame.size))
     }
 
@@ -260,6 +361,12 @@ private final class SelectionOverlayView: NSView {
     }
 
     override var acceptsFirstResponder: Bool { true }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func cancelOperation(_ sender: Any?) {
+        owner?.cancel()
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -310,6 +417,7 @@ private final class SelectionOverlayView: NSView {
     }
 
     override func mouseEntered(with event: NSEvent) {
+        guard owner != nil else { return }
         window?.makeKey()
         activateCrosshairCursor()
         if let screenPoint = globalScreenPoint(for: event) {
@@ -325,16 +433,19 @@ private final class SelectionOverlayView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
+        guard owner != nil else { return }
         guard let screenPoint = globalScreenPoint(for: event) else { return }
         owner?.pointerMoved(to: screenPoint)
         NSCursor.crosshair.set()
     }
 
     override func cursorUpdate(with event: NSEvent) {
+        guard owner != nil else { return }
         NSCursor.crosshair.set()
     }
 
     override func mouseDown(with event: NSEvent) {
+        guard owner != nil else { return }
         guard let screenPoint = globalScreenPoint(for: event) else { return }
         NSCursor.crosshair.set()
 
@@ -351,12 +462,14 @@ private final class SelectionOverlayView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        guard owner != nil else { return }
         guard let screenPoint = globalScreenPoint(for: event) else { return }
         owner?.updateArea(to: screenPoint)
         NSCursor.crosshair.set()
     }
 
     override func mouseUp(with event: NSEvent) {
+        guard owner != nil else { return }
         guard let screenPoint = globalScreenPoint(for: event) else { return }
         owner?.finishArea(at: screenPoint)
     }

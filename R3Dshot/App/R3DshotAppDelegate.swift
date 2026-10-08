@@ -199,8 +199,8 @@ final class R3DshotAppDelegate: NSObject, NSApplicationDelegate {
         NSApp.orderFrontStandardAboutPanel(
             options: [
                 .applicationName: "R3Dshot",
-                .applicationVersion: "0.1.0",
-                .version: "Phase 3"
+                .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–",
+                .version: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "–"
             ]
         )
         NSApp.activate(ignoringOtherApps: true)

@@ -60,6 +60,11 @@ if [[ ! -L "$MOUNT_POINT/Applications" || ! -f "$MOUNT_POINT/LICENSE.txt" || ! -
   echo "The mounted DMG is missing its Applications alias, license, or install instructions." >&2
   exit 1
 fi
+if [[ ! -s "$MOUNT_POINT/.background/background.png" ]] \
+  || ! cmp -s "$ROOT_DIR/script/assets/dmg-layout.dsstore" "$MOUNT_POINT/.DS_Store"; then
+  echo "The mounted DMG is missing its background or expected Finder layout." >&2
+  exit 1
+fi
 
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 xcrun stapler validate "$APP_BUNDLE"

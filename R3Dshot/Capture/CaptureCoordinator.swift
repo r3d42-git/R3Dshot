@@ -135,8 +135,17 @@ final class CaptureCoordinator {
     }
 
     private func beginUserInitiatedCapture(then startCapture: @escaping @MainActor () -> Void) {
+        // A fresh command is also a recovery path for a selection that lost
+        // focus. Only a live overlay may be replaced; asynchronous permission,
+        // window enumeration, and image capture must remain serialized.
+        if overlayController.isSelecting {
+            logger.notice("Replacing an unfinished capture selection")
+            overlayController.dismiss()
+            isCaptureInFlight = false
+        }
+
         guard !isCaptureInFlight else {
-            logger.debug("Ignoring a capture command while another capture is active")
+            logger.info("Ignoring a capture command while capture preparation or image capture is active")
             return
         }
 

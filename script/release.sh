@@ -33,9 +33,15 @@ require_command() {
   }
 }
 
-for command in xcodebuild xcrun security codesign ditto hdiutil osascript shasum rg; do
+for command in xcodebuild xcrun security codesign ditto hdiutil shasum rg; do
   require_command "$command"
 done
+
+LAYOUT_PATH="$ROOT_DIR/script/assets/dmg-layout.dsstore"
+if [[ ! -s "$LAYOUT_PATH" ]]; then
+  echo "The versioned Finder DMG layout is missing: $LAYOUT_PATH" >&2
+  exit 1
+fi
 
 if [[ -e "$RELEASE_DIR" ]]; then
   echo "Release directory already exists: $RELEASE_DIR" >&2
@@ -64,12 +70,8 @@ fi
 mkdir -p "$RELEASE_DIR"
 TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/r3dshot-release.XXXXXX")"
 RW_DMG="$TEMP_DIR/$APP_NAME-rw.dmg"
-MOUNT_POINT=""
 
 cleanup() {
-  if [[ -n "$MOUNT_POINT" && -d "$MOUNT_POINT" ]]; then
-    hdiutil detach "$MOUNT_POINT" -quiet || true
-  fi
   rm -rf "$TEMP_DIR"
 }
 trap cleanup EXIT
@@ -130,6 +132,7 @@ xcrun stapler validate "$APP_BUNDLE"
 
 STAGE_DIR="$TEMP_DIR/stage"
 mkdir -p "$STAGE_DIR/.background"
+cp "$LAYOUT_PATH" "$STAGE_DIR/.DS_Store"
 ditto "$APP_BUNDLE" "$STAGE_DIR/$APP_NAME.app"
 ln -s /Applications "$STAGE_DIR/Applications"
 cp "$ROOT_DIR/LICENSE" "$STAGE_DIR/LICENSE.txt"
@@ -148,34 +151,6 @@ hdiutil create \
   -fs HFS+ \
   -format UDRW \
   -ov "$RW_DMG" >/dev/null
-MOUNT_POINT="$(hdiutil attach "$RW_DMG" -readwrite -noverify -nobrowse | /usr/bin/awk '/\/Volumes\// { print substr($0, index($0, "/Volumes/")); exit }')"
-if [[ -z "$MOUNT_POINT" || ! -d "$MOUNT_POINT" ]]; then
-  echo "Could not mount the writable DMG." >&2
-  exit 1
-fi
-
-osascript <<APPLESCRIPT
-tell application "Finder"
-  tell disk "$APP_NAME"
-    open
-    set current view of container window to icon view
-    set toolbar visible of container window to false
-    set statusbar visible of container window to false
-    set the bounds of container window to {100, 100, 1000, 620}
-    set viewOptions to the icon view options of container window
-    set arrangement of viewOptions to not arranged
-    set icon size of viewOptions to 104
-    set background picture of viewOptions to file ".background:background.png"
-    set position of item "$APP_NAME.app" to {200, 260}
-    set position of item "Applications" to {700, 260}
-    set position of item "INSTALL R3DSHOT.txt" to {450, 410}
-    close
-  end tell
-end tell
-APPLESCRIPT
-
-hdiutil detach "$MOUNT_POINT" -quiet
-MOUNT_POINT=""
 hdiutil convert "$RW_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG_PATH" >/dev/null
 codesign --force --sign "$SIGNING_FINGERPRINT" --timestamp "$DMG_PATH"
 

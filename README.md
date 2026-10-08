@@ -46,7 +46,11 @@ Der reine Dokument-/Renderer-Smoke-Test läuft mit:
 
     ./script/test_editor_model.sh
 
-Sofern im lokalen Schlüsselbund eine Apple-Development-Identität vorhanden ist, verwendet das Skript sie automatisch. Damit bleibt die macOS-Freigabe für Bildschirmaufnahme bei späteren Debug-Builds erhalten. Eine abweichende lokale Identität kann über `R3DSHOT_CODE_SIGN_IDENTITY` gewählt werden.
+Fokus- und Abbruchverhalten der Aufnahmeauswahl lokal prüfen (benötigt eine angemeldete grafische macOS-Sitzung; zeigt kurz Auswahlfenster, erstellt keine Screenshots). Während des Tests nicht parallel mit Maus/Tastatur arbeiten; bei gemeinsam genutztem Rechner das kurze Testfenster vorher ankündigen und abstimmen:
+
+    ./script/test_selection_overlay.sh
+
+Sofern im lokalen Schlüsselbund eine Apple-Development-Identität vorhanden ist, verwendet `build_and_run.sh` sie automatisch. Damit bleibt die macOS-Freigabe für Bildschirmaufnahme bei späteren Debug-Builds erhalten. Eine abweichende lokale Identität kann über `R3DSHOT_CODE_SIGN_IDENTITY` gewählt werden.
 
 ## Lizenz
 

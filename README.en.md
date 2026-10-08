@@ -46,7 +46,11 @@ Run the document/renderer smoke test with:
 
     ./script/test_editor_model.sh
 
-If an Apple Development identity is available in the local keychain, the script uses it automatically. This preserves the macOS Screen Recording permission for later debug builds. Set `R3DSHOT_CODE_SIGN_IDENTITY` to select a different local identity.
+Check capture-selection focus and cancellation locally (requires a logged-in graphical macOS session; briefly shows selection panels without taking screenshots). Do not use the mouse or keyboard concurrently; on a shared computer, announce and agree on the brief test interval first:
+
+    ./script/test_selection_overlay.sh
+
+If an Apple Development identity is available in the local keychain, `build_and_run.sh` uses it automatically. This preserves the macOS Screen Recording permission for later debug builds. Set `R3DSHOT_CODE_SIGN_IDENTITY` to select a different local identity.
 
 ## License
 
