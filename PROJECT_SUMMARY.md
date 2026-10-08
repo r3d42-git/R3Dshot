@@ -2,12 +2,15 @@
 
 Stand: 8. Oktober 2026
 
-## Release-Vorbereitung 0.1.2 (8. Oktober 2026)
+## Abgeschlossenes Release 0.1.2 (8. Oktober 2026)
 
-- Nutzer hat Commit, Push und vollständiges Release beauftragt. Ziel: `main`, annotierter Tag `v0.1.2`, Version/Build `0.1.2/3`, `R3Dshot-0.1.2-mac-arm64.dmg` plus SHA-256-Datei.
+- [R3Dshot 0.1.2](https://github.com/r3d42-git/R3Dshot/releases/tag/v0.1.2) veröffentlicht, kein Draft/Prerelease. Release-Commit `450496514759446ee11f0229d0247014fa2b324f` auf `main`; annotierter Tag `v0.1.2` bleibt auf diesem Commit. Abschlussnachweise folgen in einem separaten Dokumentations-Commit.
+- Version/Build `0.1.2/3`, Bundle-ID `org.r3d.R3Dshot`, arm64, macOS 15.2+. Asset: [R3Dshot-0.1.2-mac-arm64.dmg](https://github.com/r3d42-git/R3Dshot/releases/download/v0.1.2/R3Dshot-0.1.2-mac-arm64.dmg), dazu `.dmg.sha256`; SHA-256 `1d06cd4007030421985560f58b0b0582a3a1c6de36d40b5e634e19537e7cdde3`.
+- Signierung mit `Developer ID Application: Philipp John Hild (G6JH37W285)`, exaktes G2-Leaf `D548540E7FE1BD9B3C4518CC02D8786E1BFEB885`, Hardened Runtime und sicherer Zeitstempel. Apple-App-Submission `fea390ae-2092-4395-84a9-bce2b0539a5c`, DMG-Submission `b33a3070-443e-447d-95ca-5d54ade2c884`: beide `Accepted`. App-Ticket vor Verpackung und zusätzlich DMG-Ticket angeheftet und validiert.
+- `release.sh`, `publish_release.sh --dry-run` und Veröffentlichung erfolgreich. Lokales und frisch von GitHub heruntergeladenes DMG vollständig geprüft: SHA-256 und GitHub-Digest identisch, Containerintegrität, Signaturen, beide angehefteten Tickets, Gatekeeper sowie Version/Bundle-ID/arm64 des jeweils exakt gemounteten App-Bundles. Layoutvorlage und Hintergrunddatei im fertigen Paket geprüft. Keine CI-Pipeline vorhanden; Build, Signierung und Veröffentlichung erfolgten lokal.
 - Versionsquellen aktualisiert; das Über-Fenster liest seine Versionswerte jetzt aus dem Bundle. DMG-Layout aus dem veröffentlichten 0.1.1-Paket als feste Vorlage übernommen; Paketierung benötigt keine Finder-Automation mehr. Verifikation prüft auch diese Vorlage und das Hintergrundbild. Der neue Vorabcheck wurde mit absichtlich fehlender Vorlage erfolgreich negativ getestet.
 - Unabhängige statische Patchprüfung ohne blockierenden Befund. Modell-/Renderer-Test erfolgreich. Der erneute native Fokus-Test scheiterte einmal an der kurzen Fokusübergabe; die Ursache des ursprünglichen Fehllaufs ist nicht eindeutig belegt. Nach Ergänzung von Zustandsdiagnosen und Umstellung von direkten `resignKey()`-Aufrufen auf echte native Fensterübergaben erfolgreich; Produktionslogik dafür nicht verändert, Anforderungen nicht abgeschwächt. Nutzer arbeitet parallel am Rechner: künftige GUI-Fokustests vorher ankündigen und ein ruhiges Testfenster abstimmen; Build/Signierung/Git benötigen keinen exklusiven Zugriff.
-- Lokales Release-Archiv 0.1.2/3 erfolgreich gebaut und signaturgeprüft. Die automatische Freigabeprüfung hielt die Apple-Einreichung zunächst vor Ausführung an; der Nutzer bestätigte App-ZIP und DMG an Apple anschließend ausdrücklich. Der vollständige repository-native Release-Ablauf wurde danach gestartet. Abschlussnachweise werden nach Veröffentlichung ergänzt.
+- Die automatische Freigabeprüfung hielt die Apple-Einreichung zunächst vor Ausführung an; nach ausdrücklicher Nutzerbestätigung für App-ZIP und DMG an Apple war der vollständige Ablauf erfolgreich. Kein Clean-Machine-Start und keine zusätzliche physische Mehrdisplay-/Ruhezustands-Abnahme des Release-Artefakts. Die laufende lokale Test-App wurde für die Veröffentlichung nicht erneut beendet oder ersetzt.
 
 ## Aufnahmeblockade und Härtung der Auswahl (8. Oktober 2026)
 
