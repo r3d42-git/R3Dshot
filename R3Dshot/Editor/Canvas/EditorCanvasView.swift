@@ -3,6 +3,7 @@ import SwiftUI
 
 struct EditorCanvasView: View {
     @Bindable var store: EditorStore
+    @Environment(\.displayScale) private var displayScale
     @SceneStorage("R3Dshot.cropAspectRatio") private var cropAspectRatioRaw = CropAspectRatio.free.rawValue
 
     @State private var interaction: CanvasInteraction?
@@ -25,13 +26,15 @@ struct EditorCanvasView: View {
                 width: max(1, Int(crop.width.rounded())),
                 height: max(1, Int(crop.height.rounded()))
             )
-            let availableWidth = max(80, geometry.size.width - 64)
-            let availableHeight = max(80, geometry.size.height - 64)
-            let fittedScale = min(
-                availableWidth / max(1, canvasSize.cgSize.width),
-                availableHeight / max(1, canvasSize.cgSize.height)
+            let fittedZoom = CanvasZoom.fittedZoom(
+                imageSize: canvasSize.cgSize,
+                viewportSize: geometry.size,
+                displayScale: displayScale
             )
-            let scale = max(0.01, fittedScale * store.zoom)
+            let scale = CanvasZoom.viewScale(
+                zoom: store.isZoomFitted ? fittedZoom : store.zoom,
+                displayScale: displayScale
+            )
             let transform = CanvasTransform(
                 canvasSize: canvasSize,
                 scale: scale,
@@ -59,7 +62,10 @@ struct EditorCanvasView: View {
                 )
             }
             .scrollIndicators(.automatic)
-            .background(Color(nsColor: .windowBackgroundColor).opacity(0.55))
+            .background(Color(nsColor: EditorAppearance.canvas))
+            .onChange(of: fittedZoom, initial: true) { _, value in
+                store.updateCanvasFitZoom(value)
+            }
         }
     }
 
@@ -72,10 +78,12 @@ struct EditorCanvasView: View {
     ) -> some View {
         ZStack(alignment: .topLeading) {
             if let previewImage {
-                Image(nsImage: NSImage(cgImage: previewImage, size: .zero))
+                Image(decorative: previewImage, scale: 1, orientation: .up)
+                    .renderingMode(.original)
                     .resizable()
-                    .interpolation(.high)
+                    .interpolation(transform.scale * displayScale >= 1 ? .none : .high)
                     .frame(width: size.width, height: size.height)
+                    .allowsHitTesting(false)
             }
 
             if let interaction,
@@ -83,8 +91,12 @@ struct EditorCanvasView: View {
                draftMarkerPoints.count > 1 {
                 markerDraftPath(points: draftMarkerPoints, scale: transform.scale)
                     .stroke(
-                        Color(red: 1, green: 0.84, blue: 0.12).opacity(0.38),
-                        style: StrokeStyle(lineWidth: 20 * transform.scale, lineCap: .round, lineJoin: .round)
+                        Color(
+                            red: store.toolDefaults.marker.color.red,
+                            green: store.toolDefaults.marker.color.green,
+                            blue: store.toolDefaults.marker.color.blue
+                        ).opacity(store.toolDefaults.marker.opacity),
+                        style: StrokeStyle(lineWidth: store.toolDefaults.marker.lineWidth * transform.scale, lineCap: .round, lineJoin: .round)
                     )
                     .allowsHitTesting(false)
             } else if let interaction,
@@ -150,7 +162,13 @@ struct EditorCanvasView: View {
         .contentShape(Rectangle())
         .coordinateSpace(name: CanvasCoordinateSpace.name)
         .gesture(surfaceGesture(transform: transform, cropAspectRatio: cropAspectRatio))
-        .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
+        // Keep the shadow off the bitmap layer: appearance changes can otherwise
+        // leave the composited screenshot blank until the document changes.
+        .background {
+            Rectangle()
+                .fill(Color.black.opacity(0.12))
+                .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
+        }
         .accessibilityLabel("Screenshot-Arbeitsfläche")
     }
 
@@ -289,6 +307,11 @@ struct EditorCanvasView: View {
     }
 
     private func beginInteraction(at point: CGPoint, transform: CanvasTransform) {
+        // A canvas click ends text editing. Otherwise the field editor can
+        // retain copy/delete/undo even after an annotation has been selected.
+        if let window = NSApp.keyWindow as? EditorWindow, window.editorStore === store {
+            window.makeFirstResponder(nil)
+        }
         switch store.activeTool {
         case .rectangle:
             interaction = CanvasInteraction(

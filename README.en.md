@@ -24,6 +24,8 @@ The editor is non-destructive. Rectangles, ellipses, arrows, markers, redactions
 
 The Dock/menu-bar lifecycle regression and the confirmation check for Quit have been resolved.
 
+Tools are grouped on the left and properties appear on the right. Tool defaults can be set before drawing. Dark mode uses layered blue tones, including the title bar; light mode remains available. The status bar offers Fit and pixel-accurate 100% views, plus feedback after saving or copying.
+
 This working state extends the editor with:
 
 - Multi-selection: Command-click adds objects to, or removes them from, the selection. The combined selection can be moved as one rigid group, deleted, copied, pasted, duplicated, and arranged in the stacking order. A selection consisting only of step markers can change its shape together.
@@ -45,6 +47,14 @@ The optional `--verify`, `--logs`, `--telemetry`, and `--debug` modes are availa
 Run the document/renderer smoke test with:
 
     ./script/test_editor_model.sh
+
+Check tool defaults, undo/redo, numbering, zoom, and keyboard routing:
+
+    ./script/test_editor_workflow.sh
+
+Open an isolated editor preview with a synthetic image:
+
+    ./script/preview_editor.sh
 
 Check capture-selection focus and cancellation locally (requires a logged-in graphical macOS session; briefly shows selection panels without taking screenshots). Do not use the mouse or keyboard concurrently; on a shared computer, announce and agree on the brief test interval first:
 

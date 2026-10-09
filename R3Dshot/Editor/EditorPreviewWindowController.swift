@@ -53,12 +53,15 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
         )
         let controller = NSHostingController(rootView: rootView)
 
-        let window = NSWindow(contentViewController: controller)
+        let window = EditorWindow(contentViewController: controller)
+        window.editorStore = store
         window.identifier = NSUserInterfaceItemIdentifier(capture.id.uuidString)
         window.title = "R3Dshot – Editor"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.minSize = NSSize(width: 720, height: 480)
         window.toolbarStyle = .unified
+        window.backgroundColor = EditorAppearance.titlebar
+        window.titlebarAppearsTransparent = true
         window.tabbingMode = .preferred
         window.delegate = self
         window.isReleasedWhenClosed = false
@@ -179,6 +182,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
                 )
             }
             store.markSaved(at: destination)
+            store.reportFeedback("Gesichert · \(destination.lastPathComponent)")
             return true
         } catch {
             present(error)
@@ -195,6 +199,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
                 preferences: preferences
             ) {
                 store.markSaved(at: destination)
+                store.reportFeedback("Gesichert · \(destination.lastPathComponent)")
             }
         } catch {
             present(error)
@@ -204,6 +209,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
     private func copyRenderedImage(_ store: EditorStore) {
         do {
             try fileStore.copyToPasteboard(renderedImage(for: store))
+            store.reportFeedback("Bild kopiert")
         } catch {
             present(error)
         }

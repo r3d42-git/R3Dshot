@@ -19,6 +19,7 @@ final class SelectionOverlayController {
     private var startupFocusTask: Task<Void, Never>?
     private var focusLossTask: Task<Void, Never>?
     private var isStarting = false
+    private var previouslyActiveApplication: NSRunningApplication?
     private var interruptionObservers: [(NotificationCenter, NSObjectProtocol)] = []
     private var mode: Mode?
     private var areaCompletion: ((CGRect) -> Void)?
@@ -64,6 +65,9 @@ final class SelectionOverlayController {
     /// capture. The caller then yields once to let the compositor present that
     /// removal before invoking `SCScreenshotManager`.
     func dismiss() {
+        let ownedKeyboardFocus = hasSelectionFocus
+        let applicationToRestore = previouslyActiveApplication
+        previouslyActiveApplication = nil
         // Invalidate first: closing a panel can synchronously resign key status.
         selectionID = nil
         startupFocusTask?.cancel()
@@ -80,6 +84,16 @@ final class SelectionOverlayController {
         displayCompletion = nil
         windowCompletion = nil
         cancellationCompletion = nil
+        if ownedKeyboardFocus {
+            NSCursor.arrow.set()
+            // Do not take focus back after the user has switched to another
+            // app or opened one of our other windows.
+            if let applicationToRestore, !applicationToRestore.isTerminated,
+               NSWorkspace.shared.frontmostApplication?.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+                NSApp.yieldActivation(to: applicationToRestore)
+                applicationToRestore.activate()
+            }
+        }
     }
 
     private func start(mode: Mode, onCancel: @escaping () -> Void) {
@@ -98,6 +112,14 @@ final class SelectionOverlayController {
             return
         }
         observeInterruptions(for: id)
+        // A key nonactivating panel can receive input while NSCursor.set only
+        // changes our app-local cursor. Acquire application cursor ownership
+        // once at startup, as well as the panel's keyboard focus.
+        let frontmostApplication = NSWorkspace.shared.frontmostApplication
+        if frontmostApplication?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            previouslyActiveApplication = frontmostApplication
+        }
+        NSApp.activate(ignoringOtherApps: true)
         panels.forEach { $0.orderFrontRegardless() }
         pointerMoved(to: NSEvent.mouseLocation)
         refreshCursorOwnership()
@@ -110,6 +132,11 @@ final class SelectionOverlayController {
             await Task.yield()
             guard let self, self.selectionID == id, !Task.isCancelled else { return }
             if !self.hasSelectionFocus { self.refreshCursorOwnership() }
+            else {
+                // Activation/menu teardown can reset the cursor even when
+                // the panel retained keyboard focus. Do not reclaim focus.
+                self.panels.first { $0.isKeyWindow }?.selectionView.activateCrosshairCursor()
+            }
             do { try await Task.sleep(nanoseconds: 250_000_000) }
             catch { return }
             guard self.selectionID == id else { return }
@@ -302,8 +329,8 @@ private final class SelectionOverlayPanel: NSPanel {
         acceptsMouseMovedEvents = true
         becomesKeyOnlyIfNeeded = false
         // Selection must stay visible while the menu-bar app is inactive.
-        // A nonactivating panel takes keyboard focus without activating the
-        // accessory app or disturbing the app being captured.
+        // The controller explicitly activates once for cursor ownership;
+        // crossing panels must not trigger additional app activations.
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
         isRestorable = false
@@ -347,6 +374,7 @@ private final class SelectionOverlayView: NSView {
     private var isPointerInside = false
     private var pointerLocation: CGPoint?
     private var trackingArea: NSTrackingArea?
+    private var cursorTrackingArea: NSTrackingArea?
 
     init(screen: NSScreen, owner: SelectionOverlayController, selectionID: UUID) {
         self.screen = screen
@@ -380,15 +408,29 @@ private final class SelectionOverlayView: NSView {
         if let trackingArea {
             removeTrackingArea(trackingArea)
         }
+        if let cursorTrackingArea {
+            removeTrackingArea(cursorTrackingArea)
+        }
 
         let trackingArea = NSTrackingArea(
             rect: bounds,
-            options: [.activeAlways, .inVisibleRect, .mouseMoved, .mouseEnteredAndExited, .cursorUpdate],
+            options: [.activeAlways, .inVisibleRect, .mouseMoved, .mouseEnteredAndExited],
             owner: self,
             userInfo: nil
         )
         addTrackingArea(trackingArea)
         self.trackingArea = trackingArea
+        // AppKit does not support cursorUpdate with activeAlways. A
+        // nonactivating selection panel can be key while its app is inactive,
+        // so give cursor tracking the panel's key-window lifetime instead.
+        let cursorTrackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.activeInKeyWindow, .inVisibleRect, .cursorUpdate],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(cursorTrackingArea)
+        self.cursorTrackingArea = cursorTrackingArea
     }
 
     override func resetCursorRects() {

@@ -50,11 +50,19 @@ struct SelectionOverlaySmoke {
         defer { controller.dismiss() }
         var cancellations = 0
         var stage = "startup"
+        func matchesCrosshair(_ cursor: NSCursor?) -> Bool {
+            guard let cursor else { return false }
+            return cursor.hotSpot == NSCursor.crosshair.hotSpot
+                && cursor.image.tiffRepresentation == NSCursor.crosshair.image.tiffRepresentation
+        }
         func diagnose(_ label: String) {
             let states = NSApp.windows.compactMap { $0 as? NSPanel }.map {
                 "\($0.windowNumber):visible=\($0.isVisible),key=\($0.isKeyWindow),selectionResponder=\($0.firstResponder === $0.contentView)"
             }.joined(separator: "; ")
-            print("[\(stage)] \(label): selecting=\(controller.isSelecting), cancellations=\(cancellations), appActive=\(NSApp.isActive); \(states)")
+            // current is app-local; the system cursor is the one actually
+            // displayed when another app remains active behind the panel.
+            let systemCursor = NSCursor.currentSystem
+            print("[\(stage)] \(label): selecting=\(controller.isSelecting), cancellations=\(cancellations), appActive=\(NSApp.isActive), localCrosshair=\(matchesCrosshair(NSCursor.current)), systemCrosshair=\(matchesCrosshair(systemCursor)), systemCursorSize=\(String(describing: systemCursor?.image.size)); \(states)")
         }
         func begin() {
             controller.beginAreaSelection(onSelection: { _ in }, onCancel: {
@@ -63,6 +71,11 @@ struct SelectionOverlaySmoke {
             })
         }
 
+        // Hotkeys start selection while another application owns the visible
+        // cursor. An app-local NSCursor.current assertion misses this case.
+        NSApp.deactivate()
+        try await pause(300)
+        try check(!NSApp.isActive, "Cursor regression starts with inactive app")
         begin()
         let shownPanels = panels()
         try check(shownPanels.count == NSScreen.screens.count, "One visible panel per display")
@@ -71,8 +84,16 @@ struct SelectionOverlaySmoke {
             try check(!panel.hidesOnDeactivate, "Inactive app must keep selection visible")
             try check(panel.canBecomeKey && !panel.canBecomeMain, "Panel key/main policy")
             try check(NSScreen.screens.contains { $0.frame == panel.frame }, "Exact screen frame")
+            panel.contentView?.updateTrackingAreas()
+            let trackingAreas = panel.contentView!.trackingAreas
+            try check(!trackingAreas.contains { $0.options.contains(.activeAlways) && $0.options.contains(.cursorUpdate) },
+                      "AppKit does not support cursorUpdate with activeAlways")
+            try check(trackingAreas.contains { $0.options.contains(.activeInKeyWindow) && $0.options.contains(.cursorUpdate) },
+                      "Key nonactivating panel must track cursor updates")
         }
         try await pause(350)
+        diagnose("initial cursor settled")
+        try check(matchesCrosshair(NSCursor.currentSystem), "Inactive startup must display the system crosshair")
         try check(controller.isSelecting, "First selection must acquire focus without Settings")
         try check(shownPanels.contains { $0.isKeyWindow && $0.firstResponder === $0.contentView },
                   "Selection view owns keyboard focus")
@@ -139,6 +160,15 @@ struct SelectionOverlaySmoke {
         NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.willSleepNotification, object: nil)
         begin()
         retiredView.cancelOperation(nil)
+        let cursorEvent = NSEvent.mouseEvent(
+            with: .mouseMoved, location: .zero, modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: 0, context: nil, eventNumber: 0,
+            clickCount: 0, pressure: 0
+        )!
+        NSCursor.arrow.set()
+        retiredView.cursorUpdate(with: cursorEvent)
+        try check(NSCursor.current === NSCursor.arrow, "Retired cursor event cannot affect replacement")
         try await pause(350)
         try check(controller.isSelecting && cancellations == 2, "Retired callbacks cannot cancel replacement")
 

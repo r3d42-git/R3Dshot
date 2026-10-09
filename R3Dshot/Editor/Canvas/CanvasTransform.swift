@@ -1,5 +1,22 @@
 import CoreGraphics
 
+/// Zoom is measured in physical display pixels per source image pixel.
+/// AppKit/SwiftUI layout uses points, so Retina screens need a conversion.
+enum CanvasZoom {
+    static func fittedZoom(imageSize: CGSize, viewportSize: CGSize, displayScale: CGFloat) -> CGFloat {
+        let availableWidth = max(1, viewportSize.width - 64)
+        let availableHeight = max(1, viewportSize.height - 64)
+        let scale = min(availableWidth / max(1, imageSize.width), availableHeight / max(1, imageSize.height))
+        // Small screenshots keep their original pixels rather than being
+        // enlarged and softened just to fill a large editor window.
+        return max(0.01, min(1, scale * max(1, displayScale)))
+    }
+
+    static func viewScale(zoom: CGFloat, displayScale: CGFloat) -> CGFloat {
+        zoom / max(1, displayScale)
+    }
+}
+
 struct CanvasTransform {
     let canvasSize: PixelSize
     let scale: CGFloat

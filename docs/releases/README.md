@@ -4,7 +4,8 @@
 - Xcode app: `org.r3d.R3Dshot`, arm64, macOS 15.2+.
 - Version sources: `Configuration/Info.plist` and both configurations in
   `R3Dshot.xcodeproj/project.pbxproj`. Increment marketing and build versions.
-- Gates: `./script/test_editor_model.sh`, `./script/test_selection_overlay.sh`
+- Gates: `./script/test_editor_model.sh`, `./script/test_editor_workflow.sh`,
+  `./script/test_selection_overlay.sh`
   (logged-in graphical session with an agreed quiet interval), `git diff --check`, scoped source review.
 - Local packaging: `./script/release.sh VERSION`. Existing G2 Developer ID,
   team `G6JH37W285`, notary Keychain profile `R3Dshot`; no credentials in Git.

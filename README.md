@@ -24,6 +24,8 @@ Der Editor arbeitet nicht-destruktiv. Rechtecke, Ellipsen, Pfeile, Marker, Schw�
 
 Die Dock-/Menüleisten-Lifecycle-Regression und die Sicherheitsabfrage für „Beenden“ sind behoben.
 
+Die Werkzeuge stehen gruppiert links, die Eigenschaften rechts. Werkzeugvorgaben lassen sich vor dem Zeichnen einstellen. Der dunkle Modus verwendet abgestufte Blautöne einschließlich Titelleiste; die helle Darstellung bleibt verfügbar. Die Statuszeile bietet Anpassen und eine pixelgenaue 100-%-Ansicht sowie Rückmeldungen nach Sichern und Kopieren.
+
 Dieser Arbeitsstand ergänzt den Editor um:
 
 - Mehrfachauswahl: Mit Befehl-Klick können mehrere Objekte zur Auswahl hinzugefügt oder daraus entfernt werden. Die gemeinsame Auswahl lässt sich starr verschieben, löschen, kopieren, einsetzen, duplizieren und in der Ebene anordnen. Bei einer Auswahl aus ausschließlich Schrittmarkierungen lässt sich deren Form gemeinsam ändern.
@@ -45,6 +47,14 @@ Die optionalen Modi `--verify`, `--logs`, `--telemetry` und `--debug` stehen fü
 Der reine Dokument-/Renderer-Smoke-Test läuft mit:
 
     ./script/test_editor_model.sh
+
+Werkzeugvorgaben, Undo/Redo, Nummerierung, Zoom und Tastaturzuordnung prüfen:
+
+    ./script/test_editor_workflow.sh
+
+Eine separate Editor-Vorschau mit synthetischem Bild öffnen:
+
+    ./script/preview_editor.sh
 
 Fokus- und Abbruchverhalten der Aufnahmeauswahl lokal prüfen (benötigt eine angemeldete grafische macOS-Sitzung; zeigt kurz Auswahlfenster, erstellt keine Screenshots). Während des Tests nicht parallel mit Maus/Tastatur arbeiten; bei gemeinsam genutztem Rechner das kurze Testfenster vorher ankündigen und abstimmen:
 

@@ -86,7 +86,12 @@ final class EditorStore {
     /// document so choosing elements never marks an image as changed.
     private(set) var selectedElementIDs: Set<UUID> = []
     var activeTool: EditorTool = .select
-    var zoom: CGFloat = 1
+    var toolDefaults = EditorToolDefaults()
+    private(set) var zoom: CGFloat = 1
+    private(set) var isZoomFitted = true
+    private(set) var canvasFitZoom: CGFloat = 1
+    private(set) var feedbackMessage: String?
+    @ObservationIgnored private var feedbackTask: Task<Void, Never>?
     var isInspectorPresented = true
     private(set) var savedURL: URL?
     /// The number assigned to the first step marker in a sequence.
@@ -106,6 +111,45 @@ final class EditorStore {
             source: capture.source
         )
         document = ScreenshotDocument(captureID: capture.id, image: capture.image)
+    }
+
+    var effectiveZoom: CGFloat { isZoomFitted ? canvasFitZoom : zoom }
+
+    func updateCanvasFitZoom(_ value: CGFloat) {
+        guard value.isFinite, value > 0 else { return }
+        canvasFitZoom = value
+    }
+
+    func fitCanvas() { isZoomFitted = true }
+
+    func showActualSize() {
+        zoom = 1
+        isZoomFitted = false
+    }
+
+    func zoomIn() { setZoom(effectiveZoom * 1.25) }
+    func zoomOut() { setZoom(effectiveZoom / 1.25) }
+
+    private func setZoom(_ value: CGFloat) {
+        zoom = min(8, max(0.01, value))
+        isZoomFitted = false
+    }
+
+    func selectTool(_ tool: EditorTool) {
+        activeTool = tool
+        feedbackMessage = nil
+        if tool != .select { clearSelection() }
+    }
+
+    /// Only the successful save/copy path reports completion.
+    func reportFeedback(_ message: String) {
+        feedbackTask?.cancel()
+        feedbackMessage = message
+        feedbackTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(4)) }
+            catch { return }
+            self?.feedbackMessage = nil
+        }
     }
 
     /// The single selected ID, or `nil` while no or multiple elements are selected.
@@ -443,7 +487,7 @@ final class EditorStore {
             let element = AnnotationElement(
                 zIndex: nextZIndex,
                 transform: ElementTransform(boundsInCanvasPixels: clamped),
-                payload: .rectangle(ShapeStyle())
+                payload: .rectangle(toolDefaults.rectangle)
             )
             document.elements.append(element)
             selectOnly(element.id)
@@ -459,7 +503,7 @@ final class EditorStore {
             let element = AnnotationElement(
                 zIndex: nextZIndex,
                 transform: ElementTransform(boundsInCanvasPixels: clamped),
-                payload: .ellipse(ShapeStyle())
+                payload: .ellipse(toolDefaults.ellipse)
             )
             document.elements.append(element)
             selectOnly(element.id)
@@ -470,14 +514,15 @@ final class EditorStore {
     func insertArrow(from start: CGPoint, to end: CGPoint) {
         guard hypot(end.x - start.x, end.y - start.y) >= 4 else { return }
         let geometry = arrowGeometry(start: start, end: end)
+        var style = toolDefaults.arrow
+        style.startPoint = geometry.start
+        style.endPoint = geometry.end
 
         perform(actionName: "Pfeil hinzufügen") {
             let element = AnnotationElement(
                 zIndex: nextZIndex,
                 transform: ElementTransform(boundsInCanvasPixels: geometry.bounds),
-                payload: .arrow(
-                    ArrowStyle(startPoint: geometry.start, endPoint: geometry.end)
-                )
+                payload: .arrow(style)
             )
             document.elements.append(element)
             selectOnly(element.id)
@@ -493,7 +538,7 @@ final class EditorStore {
             let element = AnnotationElement(
                 zIndex: nextZIndex,
                 transform: ElementTransform(boundsInCanvasPixels: clamped),
-                payload: .redaction(RedactionStyle())
+                payload: .redaction(toolDefaults.redaction)
             )
             document.elements.append(element)
             selectOnly(element.id)
@@ -523,12 +568,14 @@ final class EditorStore {
                 y: min(1, max(0, (point.y - bounds.y) / bounds.height))
             )
         }
+        var style = toolDefaults.marker
+        style.points = normalized
 
         perform(actionName: "Marker hinzufügen") {
             let element = AnnotationElement(
                 zIndex: nextZIndex,
                 transform: ElementTransform(boundsInCanvasPixels: bounds),
-                payload: .marker(MarkerStyle(points: normalized))
+                payload: .marker(style)
             )
             document.elements.append(element)
             selectOnly(element.id)
@@ -544,7 +591,7 @@ final class EditorStore {
             let element = AnnotationElement(
                 zIndex: nextZIndex,
                 transform: ElementTransform(boundsInCanvasPixels: clamped),
-                payload: .text(TextStyle())
+                payload: .text(toolDefaults.text)
             )
             document.elements.append(element)
             selectOnly(element.id)
@@ -556,7 +603,7 @@ final class EditorStore {
         let clamped = bounds.clamped(to: document.original.pixelSize, minimumSize: 24)
         guard clamped.width >= 24, clamped.height >= 24 else { return }
         perform(actionName: "Sprechblase hinzufügen") {
-            let element = AnnotationElement(zIndex: nextZIndex, transform: ElementTransform(boundsInCanvasPixels: clamped), payload: .speechBubble(SpeechBubbleStyle()))
+            let element = AnnotationElement(zIndex: nextZIndex, transform: ElementTransform(boundsInCanvasPixels: clamped), payload: .speechBubble(toolDefaults.speechBubble))
             document.elements.append(element); selectOnly(element.id); activeTool = .select
         }
     }
@@ -572,12 +619,14 @@ final class EditorStore {
             height: size
         )
         .clamped(to: document.original.pixelSize, minimumSize: 24)
+        var style = toolDefaults.stepNumber
+        style.number = nextStepNumber
 
         perform(actionName: "Schritt hinzufügen") {
             let element = AnnotationElement(
                 zIndex: nextZIndex,
                 transform: ElementTransform(boundsInCanvasPixels: bounds),
-                payload: .stepNumber(StepNumberStyle(number: nextStepNumber))
+                payload: .stepNumber(style)
             )
             document.elements.append(element)
             selectOnly(element.id)
@@ -587,11 +636,11 @@ final class EditorStore {
     }
 
     func insertPixelate(in bounds: CanvasRect) {
-        insertEffect(in: bounds, payload: .pixelate(PixelateStyle()), actionName: "Pixelierung hinzufügen")
+        insertEffect(in: bounds, payload: .pixelate(toolDefaults.pixelate), actionName: "Pixelierung hinzufügen")
     }
 
     func insertFocus(in bounds: CanvasRect) {
-        insertEffect(in: bounds, payload: .focus(FocusStyle()), actionName: "Fokus hinzufügen")
+        insertEffect(in: bounds, payload: .focus(toolDefaults.focus), actionName: "Fokus hinzufügen")
     }
 
     private func insertEffect(in bounds: CanvasRect, payload: AnnotationPayload, actionName: String) {

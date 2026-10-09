@@ -28,23 +28,8 @@ struct RectangleInspectorView: View {
                     }
                 }
                 .formStyle(.grouped)
-            } else if store.activeTool == .stepNumber && store.stepNumberCount == 0 {
-                Form {
-                    Section("Schritt") {
-                        Stepper(
-                            "Startnummer: \(store.stepNumberStart)",
-                            value: Binding(
-                                get: { store.stepNumberStart },
-                                set: { store.setStepNumberStart($0) }
-                            ),
-                            in: 1...9_999
-                        )
-                        Text("Die erste gesetzte Markierung erhält diese Nummer. Das Schrittwerkzeug bleibt für weitere Markierungen aktiv.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .formStyle(.grouped)
+            } else if !store.hasSelection && store.activeTool != .select {
+                ToolDefaultsInspector(store: store)
             } else if let style = store.selectedShapeStyle {
                 Form {
                     Section(store.selectedShapeTitle ?? "Form") {
@@ -605,14 +590,22 @@ struct RectangleInspectorView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
             } else {
-                ContentUnavailableView(
-                    "Keine Auswahl",
-                    systemImage: "cursorarrow.click",
-                    description: Text("Wähle ein Element auf der Arbeitsfläche aus.")
-                )
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("Element auswählen", systemImage: "cursorarrow.click")
+                        .font(.headline)
+                    Text("Klicke auf ein Element im Bild, um seine Eigenschaften zu ändern. Oder wähle links ein Werkzeug und zeichne ein neues Element.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(20)
             }
         }
         .frame(minWidth: 250, idealWidth: 280)
+        .scrollContentBackground(.hidden)
+        .background(Color(nsColor: EditorAppearance.panel))
     }
 
     private func update(
